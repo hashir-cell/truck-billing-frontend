@@ -1,10 +1,12 @@
 import axios from 'axios';
 
 const apiClient = axios.create({
-  baseURL: '/api/v1',
-  headers: {
-    'Content-Type': 'application/json',
+  baseURL: 'https://rena-coincident-inviolately.ngrok-free.dev/api/v1',
+   headers: {
+    "Content-Type": "application/json",
+    "ngrok-skip-browser-warning": "true",
   },
+  credentials: "include",
 });
 
 
