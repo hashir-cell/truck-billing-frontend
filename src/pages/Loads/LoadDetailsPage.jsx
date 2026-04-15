@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getLoad, transitionLoad } from '../../services/api';
+import { getLoad, transitionLoad, updateLoad } from '../../services/api';
 import { 
   ArrowLeft, 
   Package, 
@@ -16,7 +16,10 @@ import {
   ChevronRight,
   Loader2,
   MoreVertical,
-  Plus
+  Plus,
+  Edit2,
+  Save,
+  XCircle
 } from 'lucide-react';
 import StatusBadge from '../../components/common/StatusBadge';
 import DocumentUploadModal from '../../components/layout/DocumentUploadModal';
@@ -28,6 +31,9 @@ const LoadDetailsPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedData, setEditedData] = useState({});
+  const [saving, setSaving] = useState(false);
 
   const fetchLoadData = async (isInitial = false) => {
     try {
@@ -46,13 +52,54 @@ const LoadDetailsPage = () => {
   useEffect(() => {
     fetchLoadData(true);
 
-    // Setup real-time polling (every 5 seconds)
-    const interval = setInterval(() => {
-      fetchLoadData(false);
-    }, 5000);
+    // Setup real-time polling (every 5 seconds) - but only if not editing
+    let interval;
+    if (!isEditing) {
+      interval = setInterval(() => {
+        fetchLoadData(false);
+      }, 5000);
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [id, isEditing]);
 
-    return () => clearInterval(interval);
-  }, [id]);
+  const handleStartEdit = () => {
+    setEditedData({
+      origin: load.origin || '',
+      destination: load.destination || '',
+      customer_name: load.customer_name || '',
+      broker_name: load.broker_name || '',
+      total_revenue: load.total_revenue || 0,
+      invoice_amount: load.invoice_amount || 0,
+      invoice_number: load.invoice_number || ''
+    });
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditedData({});
+  };
+
+  const handleSaveEdit = async () => {
+    setSaving(true);
+    try {
+      await updateLoad(id, editedData);
+      await fetchLoadData(true);
+      setIsEditing(false);
+      setEditedData({});
+    } catch (err) {
+      alert('Failed to update load: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleInputChange = (field, value) => {
+    setEditedData(prev => ({ ...prev, [field]: value }));
+  };
 
   if (loading) {
     return (
@@ -96,9 +143,80 @@ const LoadDetailsPage = () => {
           <ArrowLeft size={18} />
         </button>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <h1 style={{ fontSize: '1.75rem', fontWeight: '800' }}>Load #{load.reference_number}</h1>
-            <StatusBadge status={load.state} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <h1 style={{ fontSize: '1.75rem', fontWeight: '800' }}>Load #{load.reference_number}</h1>
+              <StatusBadge status={load.state} />
+            </div>
+
+            {!isEditing ? (
+              <button 
+                onClick={handleStartEdit}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid var(--border)',
+                  backgroundColor: 'white',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: 'var(--text-main)',
+                  transition: 'all 0.2s'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.borderColor = 'var(--primary)'}
+                onMouseOut={(e) => e.currentTarget.style.borderColor = 'var(--border)'}
+              >
+                <Edit2 size={16} />
+                Edit Shipment
+              </button>
+            ) : (
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button 
+                  onClick={handleSaveEdit}
+                  disabled={saving}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '0.5rem',
+                    border: 'none',
+                    backgroundColor: 'var(--success)',
+                    color: 'white',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.2)'
+                  }}
+                >
+                  {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                  Save
+                </button>
+                <button 
+                  onClick={handleCancelEdit}
+                  disabled={saving}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '0.5rem',
+                    border: '1px solid var(--border)',
+                    backgroundColor: 'white',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    color: 'var(--error)'
+                  }}
+                >
+                  <XCircle size={16} />
+                  Cancel
+                </button>
+              </div>
+            )}
           </div>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: '0.25rem' }}>
             System ID: <span style={{ fontFamily: 'monospace' }}>{load.id}</span>
@@ -121,11 +239,27 @@ const LoadDetailsPage = () => {
               <div>
                 <div style={{ marginBottom: '1.25rem' }}>
                   <label style={labelStyle}><MapPin size={14} /> Origin</label>
-                  <p style={valueStyle}>{load.origin || "N/A"}</p>
+                  {isEditing ? (
+                    <input 
+                      style={inputStyle}
+                      value={editedData.origin}
+                      onChange={(e) => handleInputChange('origin', e.target.value)}
+                    />
+                  ) : (
+                    <p style={valueStyle}>{load.origin || "N/A"}</p>
+                  )}
                 </div>
                 <div>
                   <label style={labelStyle}><MapPin size={14} /> Destination</label>
-                  <p style={valueStyle}>{load.destination || "N/A"}</p>
+                  {isEditing ? (
+                    <input 
+                      style={inputStyle}
+                      value={editedData.destination}
+                      onChange={(e) => handleInputChange('destination', e.target.value)}
+                    />
+                  ) : (
+                    <p style={valueStyle}>{load.destination || "N/A"}</p>
+                  )}
                 </div>
               </div>
               <div>
@@ -135,7 +269,24 @@ const LoadDetailsPage = () => {
                 </div>
                 <div>
                   <label style={labelStyle}><Clock size={14} /> Broker / Customer</label>
-                  <p style={valueStyle}>{load.customer_name || load.broker_name || "Unknown"}</p>
+                  {isEditing ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <input 
+                        style={inputStyle}
+                        placeholder="Customer Name"
+                        value={editedData.customer_name}
+                        onChange={(e) => handleInputChange('customer_name', e.target.value)}
+                      />
+                      <input 
+                        style={inputStyle}
+                        placeholder="Broker Name"
+                        value={editedData.broker_name}
+                        onChange={(e) => handleInputChange('broker_name', e.target.value)}
+                      />
+                    </div>
+                  ) : (
+                    <p style={valueStyle}>{load.customer_name || load.broker_name || "Unknown"}</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -150,15 +301,41 @@ const LoadDetailsPage = () => {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem' }}>
               <div style={finItemStyle}>
                 <span style={labelStyle}>Total Revenue</span>
-                <span style={{ ...valueStyle, fontSize: '1.25rem', color: '#059669' }}>${load.total_revenue?.toLocaleString() || '0.00'}</span>
+                {isEditing ? (
+                  <input 
+                    type="number"
+                    style={inputStyle}
+                    value={editedData.total_revenue}
+                    onChange={(e) => handleInputChange('total_revenue', parseFloat(e.target.value))}
+                  />
+                ) : (
+                  <span style={{ ...valueStyle, fontSize: '1.25rem', color: '#059669' }}>${load.total_revenue?.toLocaleString() || '0.00'}</span>
+                )}
               </div>
               <div style={finItemStyle}>
                 <span style={labelStyle}>Invoice Amount</span>
-                <span style={{ ...valueStyle, fontSize: '1.25rem', color: 'var(--primary)' }}>${load.invoice_amount?.toLocaleString() || '0.00'}</span>
+                {isEditing ? (
+                  <input 
+                    type="number"
+                    style={inputStyle}
+                    value={editedData.invoice_amount}
+                    onChange={(e) => handleInputChange('invoice_amount', parseFloat(e.target.value))}
+                  />
+                ) : (
+                  <span style={{ ...valueStyle, fontSize: '1.25rem', color: 'var(--primary)' }}>${load.invoice_amount?.toLocaleString() || '0.00'}</span>
+                )}
               </div>
               <div style={finItemStyle}>
                 <span style={labelStyle}>Billed Invoice #</span>
-                <span style={{ ...valueStyle, fontSize: '1.25rem' }}>{load.invoice_number || "—"}</span>
+                {isEditing ? (
+                  <input 
+                    style={inputStyle}
+                    value={editedData.invoice_number}
+                    onChange={(e) => handleInputChange('invoice_number', e.target.value)}
+                  />
+                ) : (
+                  <span style={{ ...valueStyle, fontSize: '1.25rem' }}>{load.invoice_number || "—"}</span>
+                )}
               </div>
             </div>
           </div>
@@ -425,6 +602,19 @@ const finItemStyle = {
   backgroundColor: 'white',
   borderRadius: '0.75rem',
   border: '1px solid var(--border)'
+};
+
+const inputStyle = {
+  width: '100%',
+  padding: '0.625rem 0.875rem',
+  borderRadius: '0.5rem',
+  border: '1px solid var(--border)',
+  fontSize: '0.875rem',
+  fontWeight: '500',
+  outline: 'none',
+  backgroundColor: 'white',
+  transition: 'all 0.2s',
+  borderColor: 'var(--primary-light)'
 };
 
 export default LoadDetailsPage;

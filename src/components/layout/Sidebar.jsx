@@ -1,9 +1,11 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Truck, AlertCircle, Users, Settings, Zap } from 'lucide-react';
+import { LayoutDashboard, Truck, AlertCircle, Settings, Zap, LogOut, Bell } from 'lucide-react';
 import TenantSelector from './TenantSelector';
+import { useAuth } from '../../context/AuthContext';
 
 const Sidebar = () => {
+  const { user, logout } = useAuth();
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
@@ -30,17 +32,30 @@ const Sidebar = () => {
           <AlertCircle size={20} />
           <span>Exceptions</span>
         </NavLink>
-        <NavLink to="/tenants" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-          <Users size={20} />
-          <span>Tenants</span>
+        <NavLink to="/notifications" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <Bell size={20} />
+          <span>Notifications</span>
         </NavLink>
       </nav>
 
-      <div style={{ marginTop: 'auto' }}>
+      <div className="sidebar-footer">
         <NavLink to="/settings" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
           <Settings size={20} />
           <span>Settings</span>
         </NavLink>
+        <button onClick={logout} className="nav-link logout-btn">
+          <LogOut size={20} />
+          <span>Logout</span>
+        </button>
+        {user && (
+          <div className="user-profile">
+            <div className="user-avatar">{user.full_name?.charAt(0) || 'U'}</div>
+            <div className="user-info">
+              <span className="user-name">{user.full_name}</span>
+              <span className="user-email">{user.email}</span>
+            </div>
+          </div>
+        )}
       </div>
     </aside>
   );

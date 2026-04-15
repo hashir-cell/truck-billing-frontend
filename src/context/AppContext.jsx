@@ -1,9 +1,11 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { getTenants } from '../services/api';
+import { useAuth } from './AuthContext';
 
 const AppContext = createContext();
 
 export const AppProvider = ({ children }) => {
+  const { isAuthenticated } = useAuth();
   const [tenants, setTenants] = useState([]);
   const [selectedTenantId, setSelectedTenantId] = useState(
     localStorage.getItem('selectedTenantId') || null
@@ -12,7 +14,13 @@ export const AppProvider = ({ children }) => {
   const [error, setError] = useState(null);
 
   const fetchTenants = async () => {
+    if (!isAuthenticated) {
+      setLoading(false);
+      return;
+    }
+
     try {
+      setLoading(true);
       const res = await getTenants();
       setTenants(res);
       
@@ -28,8 +36,13 @@ export const AppProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    fetchTenants();
-  }, []);
+    if (isAuthenticated) {
+      fetchTenants();
+    } else {
+      setTenants([]);
+      setLoading(false);
+    }
+  }, [isAuthenticated]);
 
   const handleSelectTenant = (id) => {
     setSelectedTenantId(id);

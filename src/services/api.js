@@ -1,28 +1,45 @@
 import axios from 'axios';
 
 const apiClient = axios.create({
-  baseURL: 'https://rena-coincident-inviolately.ngrok-free.dev/api/v1',
+  baseURL: 'http://localhost:8000/api/v1',
    headers: {
     "Content-Type": "application/json",
-    "ngrok-skip-browser-warning": "true",
   },
   credentials: "include",
 });
 
 
 apiClient.interceptors.request.use((config) => {
-  const tenantId = localStorage.getItem('selectedTenantId');
-  if (tenantId) {
-    config.params = {
-      ...config.params,
-      tenant_id: tenantId,
-      tenant: tenantId, 
-    };
+  const token = localStorage.getItem('access_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 }, (error) => {
   return Promise.reject(error);
 });
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      // Don't redirect if we're already on the login page or if it's the login request itself
+      const isLoginRequest = error.config.url.endsWith('/login');
+      const isOnLoginPage = window.location.pathname.endsWith('/login');
+
+      if (!isLoginRequest) {
+        // Clear stale auth data
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('user');
+        
+        if (!isOnLoginPage) {
+          window.location.href = '/login';
+        }
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 export const getDashboardSummary = async (params) => {
   try{
@@ -55,10 +72,8 @@ export const getLoad = async (loadId) => {
 };
 
 export const getExceptions = async () => {
-  const tenantId = localStorage.getItem('selectedTenantId');
   const res = await apiClient.get("/loads", { 
     params: { 
-      tenant: tenantId,
       state: 'EXCEPTION' 
     } 
   });
@@ -82,6 +97,27 @@ export const createTenant = async (data) => {
   const res = await apiClient.post("/tenants", data);
   return res.data;
 };
+
+export const updateTenant = async (tenantId, data) => {
+  const res = await apiClient.patch(`/tenant/${tenantId}`, data);
+  return res.data;
+};
+
+export const deleteTenant = async (tenantId) => {
+  const res = await apiClient.delete(`/tenant/${tenantId}`);
+  return res.data;
+};
+
+export const updateLoad = async (loadId, data) => {
+  const res = await apiClient.patch(`/load/${loadId}`, data);
+  return res.data;
+};
+
+export const deleteLoad = async (loadId) => {
+  const res = await apiClient.delete(`/loads/${loadId}`);
+  return res.data;
+};
+
 
 export const transitionLoad = (loadId, newState) => {
   return apiClient.post(`/loads/${loadId}/transition`, {
@@ -128,10 +164,8 @@ export const ingestInvoice = async (file) => {
 };
 
 export const ingestDocument = async (file, docType, loadId) => {
-  const tenantId = localStorage.getItem('selectedTenantId');
   const formData = new FormData();
   formData.append('file', file);
-  formData.append('tenant_id', tenantId);
   formData.append('doc_type', docType);
   if (loadId) formData.append('load_id', loadId);
 
@@ -140,9 +174,49 @@ export const ingestDocument = async (file, docType, loadId) => {
       'Content-Type': 'multipart/form-data',
     },
     params: {
-      load_id: loadId // Some backends might want it here too
+      load_id: loadId
     }
   });
+  return res.data;
+};
+
+export const assembleBatch = async (limit = 10) => {
+  const res = await apiClient.post("/batches/assemble", null, {
+    params: { limit }
+  });
+  return res.data;
+};
+
+// -- Notifications --
+export const getNotifications = async (params) => {
+  // params: tenant_id, load_id, unread_only
+  const res = await apiClient.get("/notifications", { params });
+  return res.data;
+};
+
+export const markNotificationRead = async (notificationId) => {
+  const res = await apiClient.patch(`/notifications/${notificationId}`, { is_read: true });
+  return res.data;
+};
+
+export const retryNotification = async (notificationId) => {
+  const res = await apiClient.post(`/notifications/${notificationId}/retry`);
+  return res.data;
+};
+
+// -- Gmail OAuth --
+export const getGmailConnectUrl = async () => {
+  const res = await apiClient.get('/auth/gmail/connect');
+  return res.data;
+};
+
+export const getGmailStatus = async () => {
+  const res = await apiClient.get('/auth/gmail/status');
+  return res.data;
+};
+
+export const disconnectGmail = async () => {
+  const res = await apiClient.delete('/auth/gmail/disconnect');
   return res.data;
 };
 

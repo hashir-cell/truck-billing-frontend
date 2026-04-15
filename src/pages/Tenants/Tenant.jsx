@@ -1,12 +1,38 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import StatusBadge from '../../components/common/StatusBadge';
-import { CheckCircle2, Building2, Globe, Settings2 } from 'lucide-react';
+import { CheckCircle2, Building2, Globe, Settings2, Trash2 } from 'lucide-react';
+import { deleteTenant } from '../../services/api';
 import CreateTenantModal from '../../components/layout/CreateTenantModal';
 
 const Tenant = () => {
-  const { tenants, selectedTenantId, setSelectedTenantId, loading, error } = useApp();
+  const { tenants, selectedTenantId, setSelectedTenantId, fetchTenants, loading, error } = useApp();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingTenant, setEditingTenant] = useState(null);
+
+  const handleEdit = (tenant) => {
+    setEditingTenant(tenant);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setEditingTenant(null);
+  };
+
+  const handleDelete = async (tenantId) => {
+    if (window.confirm('Are you sure you want to delete this organization? All associated data will be removed.')) {
+      try {
+        await deleteTenant(tenantId);
+        await fetchTenants();
+        if (selectedTenantId === tenantId) {
+          setSelectedTenantId(null);
+        }
+      } catch (err) {
+        alert('Failed to delete tenant: ' + (err.response?.data?.detail || err.message));
+      }
+    }
+  };
 
   if (loading) return <div style={{ padding: '2rem' }}>Loading tenants...</div>;
   if (error) return <div style={{ padding: '2rem', color: 'var(--error)' }}>Error: {error.message}</div>;
@@ -21,7 +47,10 @@ const Tenant = () => {
           </p>
         </div>
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => {
+            setEditingTenant(null);
+            setIsModalOpen(true);
+          }}
           className="button-primary" 
           style={{ 
             backgroundColor: 'var(--primary)', 
@@ -53,7 +82,7 @@ const Tenant = () => {
             </tr>
           </thead>
           <tbody>
-            {tenants.map((tenant) => {
+            {(tenants || []).map((tenant) => {
               const isActive = tenant.id === selectedTenantId;
               return (
                 <tr key={tenant.id} style={{ 
@@ -132,15 +161,33 @@ const Tenant = () => {
                           Switch to Tenant
                         </button>
                       )}
-                      <button style={{ 
-                        padding: '0.5rem', 
-                        borderRadius: '0.5rem', 
-                        border: 'none',
-                        background: 'transparent',
-                        color: 'var(--text-muted)',
-                        cursor: 'pointer'
-                      }}>
+                      
+                      <button 
+                        onClick={() => handleEdit(tenant)}
+                        style={{ 
+                          padding: '0.5rem', 
+                          borderRadius: '0.5rem', 
+                          border: 'none',
+                          background: 'transparent',
+                          color: 'var(--text-muted)',
+                          cursor: 'pointer'
+                        }}
+                      >
                         <Settings2 size={18} />
+                      </button>
+
+                      <button 
+                        onClick={() => handleDelete(tenant.id)}
+                        style={{ 
+                          padding: '0.5rem', 
+                          borderRadius: '0.5rem', 
+                          border: 'none',
+                          background: 'transparent',
+                          color: '#f87171',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <Trash2 size={18} />
                       </button>
                     </div>
                   </td>
@@ -149,7 +196,7 @@ const Tenant = () => {
             })}
           </tbody>
         </table>
-        {tenants.length === 0 && (
+        {(!tenants || tenants.length === 0) && (
           <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-muted)' }}>
             <Building2 size={48} style={{ marginBottom: '1rem', opacity: 0.2 }} />
             <p>No tenants found. Create your first organization to get started.</p>
@@ -159,7 +206,8 @@ const Tenant = () => {
 
       <CreateTenantModal 
         isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+        onClose={handleCloseModal} 
+        tenant={editingTenant}
       />
     </div>
   );

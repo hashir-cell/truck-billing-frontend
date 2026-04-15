@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { X, Building2, Globe, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { createTenant } from '../../services/api';
+import { createTenant, updateTenant } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 
-const CreateTenantModal = ({ isOpen, onClose }) => {
+const CreateTenantModal = ({ isOpen, onClose, tenant = null }) => {
   const { fetchTenants } = useApp();
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
@@ -11,12 +11,23 @@ const CreateTenantModal = ({ isOpen, onClose }) => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
 
-  // Auto-generate slug from name
+  // Initialize from tenant if provided (Edit Mode)
   useEffect(() => {
-    if (name && !slug) {
+    if (tenant) {
+      setName(tenant.name || '');
+      setSlug(tenant.slug || '');
+    } else {
+      setName('');
+      setSlug('');
+    }
+  }, [tenant, isOpen]);
+
+  // Auto-generate slug from name (only if not in Edit Mode or slug is empty)
+  useEffect(() => {
+    if (!tenant && name && !slug) {
       setSlug(name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, ''));
     }
-  }, [name]);
+  }, [name, tenant]);
 
   if (!isOpen) return null;
 
@@ -25,21 +36,30 @@ const CreateTenantModal = ({ isOpen, onClose }) => {
     setLoading(true);
     setError(null);
     try {
-      await createTenant({ name, slug, config: {} });
-      setSuccess(true);
+      if (tenant) {
+        await updateTenant(tenant.id, { name, slug });
+        setSuccess(true);
+      } else {
+        await createTenant({ name, slug, config: {} });
+        setSuccess(true);
+      }
+      
       await fetchTenants();
       setTimeout(() => {
         onClose();
         setSuccess(false);
-        setName('');
-        setSlug('');
+        if (!tenant) {
+          setName('');
+          setSlug('');
+        }
       }, 1500);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to create organization. Check if slug is unique.');
+      setError(err.response?.data?.detail || `Failed to ${tenant ? 'update' : 'create'} organization.`);
     } finally {
       setLoading(false);
     }
   };
+
 
   return (
     <div style={overlayStyle}>
@@ -50,8 +70,8 @@ const CreateTenantModal = ({ isOpen, onClose }) => {
               <Building2 size={20} color="var(--primary)" />
             </div>
             <div>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: '800' }}>Register Organization</h3>
-              <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Setup a new tenant for the billing engine.</p>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '800' }}>{tenant ? 'Edit Organization' : 'Register Organization'}</h3>
+              <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{tenant ? 'Modify organization details and configuration.' : 'Setup a new tenant for the billing engine.'}</p>
             </div>
           </div>
           <button onClick={onClose} style={closeButtonStyle}>
@@ -70,7 +90,7 @@ const CreateTenantModal = ({ isOpen, onClose }) => {
           {success ? (
             <div style={successStyle}>
               <CheckCircle2 size={32} color="var(--success)" />
-              <p style={{ fontWeight: '700', marginTop: '0.75rem' }}>Organization Created!</p>
+              <p style={{ fontWeight: '700', marginTop: '0.75rem' }}>Organization {tenant ? 'Updated' : 'Created'}!</p>
               <p style={{ fontSize: '0.875rem' }}>Refreshing system dashboard...</p>
             </div>
           ) : (
@@ -121,7 +141,7 @@ const CreateTenantModal = ({ isOpen, onClose }) => {
                     borderRadius: '0.75rem'
                   }}
                 >
-                  {loading ? <Loader2 size={18} className="animate-spin" /> : 'Complete Registration'}
+                  {loading ? <Loader2 size={18} className="animate-spin" /> : (tenant ? 'Save Changes' : 'Complete Registration')}
                 </button>
               </div>
             </>
