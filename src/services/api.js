@@ -2,6 +2,7 @@ import axios from 'axios';
 
 const apiClient = axios.create({
   baseURL: 'https://rena-coincident-inviolately.ngrok-free.dev/api/v1',
+  // baseURL: 'http://127.0.0.1:8000/api/v1',
    headers: {
     "Content-Type": "application/json",
     "ngrok-skip-browser-warning": "true",
@@ -219,6 +220,32 @@ export const getGmailStatus = async () => {
 
 export const disconnectGmail = async () => {
   const res = await apiClient.delete('/auth/gmail/disconnect');
+  return res.data;
+};
+
+export const uploadLogo = async (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await apiClient.post("/branding/logo", formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return res.data;
+};
+
+export const getBatches = async () => {
+    const res = await apiClient.get('/batches');
+    return res.data;
+};
+
+export const postBatchPayment = async (batchId, data) => {
+    const res = await apiClient.patch(`/batches/${batchId}/pay`, data);
+    return res.data;
+};
+
+export const updateBrandingSettings = async (data) => {
+  const res = await apiClient.patch("/branding/settings", data);
   return res.data;
 };
 

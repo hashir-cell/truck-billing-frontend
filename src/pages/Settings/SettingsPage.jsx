@@ -99,9 +99,15 @@ const SettingsPage = () => {
   // Sync with selectedTenant config when it changes
   useEffect(() => {
     if (selectedTenant && selectedTenant.config) {
+      let configData = JSON.parse(JSON.stringify(selectedTenant.config));
+      
+      if (configData.twilio && configData.twilio.auth_token) {
+        configData.twilio.auth_token = "********";
+      }
+
       setFormData(prev => ({
         ...prev,
-        ...selectedTenant.config
+        ...configData
       }));
     }
   }, [selectedTenant]);
@@ -548,6 +554,8 @@ const SettingsPage = () => {
           border-radius: 0.5rem;
           border: 1px solid var(--border);
           font-size: 0.875rem;
+          background: white;
+          color: var(--text-main);
           outline: none;
           transition: all 0.2s ease;
         }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { triggerOrchestration } from '../../services/api';
+import { triggerOrchestration, getGmailStatus, getDashboardSummary } from '../../services/api';
 import { 
   Zap, 
   CheckCircle2, 
@@ -35,9 +35,40 @@ const PIPELINE_STAGES = [
 const OrchestrationPage = () => {
   const { selectedTenant } = useApp();
   
-  // -1: idle, 0: ingestion, 1: collection, 2: evaluation, 3: settlement, 4: complete, 5: error
   const [currentStageId, setCurrentStageId] = useState(-1);
   const [results, setResults] = useState(null);
+  const [gmailStatus, setGmailStatus] = useState({ connected: false });
+  const [queueStats, setQueueStats] = useState({ awaiting_sync: 0, new_invoices: 0 });
+  const [isReadinessLoading, setIsReadinessLoading] = useState(true);
+
+  const fetchReadiness = async () => {
+    if (!selectedTenant) return;
+    setIsReadinessLoading(true);
+    try {
+      const [gmail, summary] = await Promise.all([
+        getGmailStatus(),
+        getDashboardSummary()
+      ]);
+      setGmailStatus(gmail);
+      setQueueStats({
+        awaiting_sync: summary.total_loads || 0, // Simplified mapping for now
+        new_invoices: summary.exceptions_count || 0 // Simplified mapping for now
+      });
+    } catch (err) {
+      console.error('Failed to fetch readiness data', err);
+    } finally {
+      setIsReadinessLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchReadiness();
+  }, [selectedTenant]);
+
+  const isTwilioConnected = !!(
+    selectedTenant?.config?.twilio?.account_sid && 
+    selectedTenant?.config?.twilio?.from_number
+  );
 
   const getJourneyData = () => {
     if (!results) return [];
@@ -164,11 +195,21 @@ const OrchestrationPage = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.875rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ color: 'var(--text-muted)' }}>Gmail Service</span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--success)', fontWeight: '500' }}><Check size={14}/> Connected</span>
+                  {isReadinessLoading ? (
+                    <Loader2 size={14} className="animate-spin" color="var(--text-muted)" />
+                  ) : gmailStatus.connected ? (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--success)', fontWeight: '500' }}><Check size={14}/> Connected</span>
+                  ) : (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--error)', fontWeight: '500' }}><AlertCircle size={14}/> Disconnected</span>
+                  )}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ color: 'var(--text-muted)' }}>Twilio Service</span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--success)', fontWeight: '500' }}><Check size={14}/> Connected</span>
+                  {isTwilioConnected ? (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--success)', fontWeight: '500' }}><Check size={14}/> Connected</span>
+                  ) : (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--error)', fontWeight: '500' }}><AlertCircle size={14}/> Disconnected</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -180,12 +221,12 @@ const OrchestrationPage = () => {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
-                  <div style={{ fontSize: '1.75rem', fontWeight: 600, color: 'var(--text-main)' }}>24</div>
-                  <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Awaiting Sync</div>
+                  <div style={{ fontSize: '1.75rem', fontWeight: 600, color: 'var(--text-main)' }}>{isReadinessLoading ? '...' : queueStats.awaiting_sync}</div>
+                  <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Active Loads</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: '1.75rem', fontWeight: 600, color: 'var(--text-main)' }}>6</div>
-                  <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>New Invoices</div>
+                  <div style={{ fontSize: '1.75rem', fontWeight: 600, color: 'var(--text-main)' }}>{isReadinessLoading ? '...' : queueStats.new_invoices}</div>
+                  <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Exceptions</div>
                 </div>
               </div>
             </div>

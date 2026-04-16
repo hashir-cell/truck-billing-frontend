@@ -51,6 +51,23 @@ export const AppProvider = ({ children }) => {
 
   const selectedTenant = tenants.find(t => t.id === selectedTenantId);
 
+  useEffect(() => {
+    if (selectedTenant && selectedTenant.config && selectedTenant.config.branding) {
+      const { primary_color } = selectedTenant.config.branding;
+      if (primary_color) {
+        document.documentElement.style.setProperty('--primary', primary_color);
+        // Generate a light version (10% opacity) for backgrounds
+        document.documentElement.style.setProperty('--primary-light', `${primary_color}1a`);
+        // Generate a hover version (darker) - for simplicity we just set a shadow or slight shift
+        document.documentElement.style.setProperty('--primary-hover', primary_color);
+      }
+    } else {
+      // Reset to defaults
+      document.documentElement.style.setProperty('--primary', '#2563eb');
+      document.documentElement.style.setProperty('--primary-light', '#eff6ff');
+    }
+  }, [selectedTenant]);
+
   const value = {
     tenants,
     selectedTenantId,

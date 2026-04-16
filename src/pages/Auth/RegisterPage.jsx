@@ -27,7 +27,7 @@ const RegisterPage = () => {
 
     try {
       await register(formData);
-      navigate('/');
+      navigate('/onboarding');
     } catch (err) {
       console.error('Registration failed:', err);
       setError(err.response?.data?.detail || 'Registration failed. Please check your details.');
@@ -41,8 +41,8 @@ const RegisterPage = () => {
       <div className="login-card">
         <div className="login-header">
           <div className="logo-section">
-            <div className="logo-icon">AG</div>
-            <h1>Join Antigravity</h1>
+            <div className="logo-icon">GNS</div>
+            <h1>Join GNS Billing</h1>
           </div>
           <p>Create your tenant account to get started</p>
         </div>
