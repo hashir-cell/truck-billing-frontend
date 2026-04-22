@@ -10,7 +10,7 @@ const FileUploader = ({
 }) => {
   const [file, setFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [status, setStatus] = useState('idle'); // idle, uploading, success, error
+  const [status, setStatus] = useState('idle'); // idle, uploading, success, warning, error
   const [message, setMessage] = useState('');
   const fileInputRef = useRef(null);
 
@@ -53,8 +53,14 @@ const FileUploader = ({
     setStatus('uploading');
     try {
       const result = await onUpload(file);
-      setStatus('success');
-      setMessage(JSON.stringify(result, null, 2));
+      
+      if (result.mismatch_detected) {
+        setStatus('warning');
+        setMessage(result.message);
+      } else {
+        setStatus('success');
+        setMessage(result.message || 'The system has successfully imported and synchronized the data.');
+      }
     } catch (err) {
       setStatus('error');
       setMessage(err.response?.data?.detail || err.message || 'Upload failed');
@@ -189,7 +195,7 @@ const FileUploader = ({
           <div style={{ flex: 1 }}>
             <p style={{ color: '#15803d', fontWeight: '700', fontSize: '0.875rem' }}>Processing Complete</p>
             <p style={{ color: '#166534', fontSize: '0.8125rem', marginTop: '0.25rem' }}>
-              The system has successfully imported and synchronized the data.
+              {message}
             </p>
             <button 
               onClick={reset}
@@ -207,6 +213,44 @@ const FileUploader = ({
               }}
             >
               Upload Another
+            </button>
+          </div>
+        </div>
+      )}
+
+      {status === 'warning' && (
+        <div style={{ 
+          marginTop: '1.25rem', 
+          padding: '1rem', 
+          backgroundColor: '#fffbeb', 
+          borderRadius: '0.75rem',
+          display: 'flex',
+          gap: '0.75rem',
+          border: '1px solid #fde68a',
+          animation: 'fadeIn 0.3s ease-out'
+        }}>
+          <AlertCircle size={20} color="#d97706" />
+          <div style={{ flex: 1 }}>
+            <p style={{ color: '#92400e', fontWeight: '700', fontSize: '0.875rem' }}>Validation Warning</p>
+            <p style={{ color: '#b45309', fontSize: '0.8125rem', marginTop: '0.25rem' }}>
+              {message}
+            </p>
+            <button 
+              onClick={reset}
+              style={{ 
+                marginTop: '0.75rem', 
+                background: 'white', 
+                border: '1px solid #fde68a', 
+                color: '#92400e',
+                padding: '0.375rem 1rem',
+                borderRadius: '0.375rem',
+                fontSize: '0.75rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              Try Another File
             </button>
           </div>
         </div>

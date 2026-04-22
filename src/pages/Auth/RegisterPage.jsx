@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { Truck } from 'lucide-react';
 import './Auth.css';
 
 const RegisterPage = () => {
   const [formData, setFormData] = useState({
-    tenant_name: '',
     tenant_slug: '',
     full_name: '',
     email: '',
@@ -25,8 +25,17 @@ const RegisterPage = () => {
     setError('');
     setIsLoading(true);
 
+    // Derive tenant_name from slug (e.g. "acme-logistics" -> "Acme Logistics")
+    const derivedName = formData.tenant_slug
+      .split(/[-_]/)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+
     try {
-      await register(formData);
+      await register({
+        ...formData,
+        tenant_name: derivedName
+      });
       navigate('/onboarding');
     } catch (err) {
       console.error('Registration failed:', err);
@@ -41,27 +50,29 @@ const RegisterPage = () => {
       <div className="login-card">
         <div className="login-header">
           <div className="logo-section">
-            <div className="logo-icon">GNS</div>
-            <h1>Join GNS Billing</h1>
+            <div className="logo-icon">
+              <Truck size={32} strokeWidth={2.5} />
+            </div>
+            <h1>Create Account</h1>
           </div>
-          <p>Create your tenant account to get started</p>
+          <p>Launch your fleet's command center</p>
         </div>
 
         <form onSubmit={handleSubmit} className="login-form">
           <div className="form-group">
-            <label htmlFor="tenant_name">Company Name</label>
+            <label htmlFor="full_name">Full Name</label>
             <input
-              id="tenant_name"
+              id="full_name"
               type="text"
-              placeholder="e.g. Acme Logistics"
-              value={formData.tenant_name}
+              placeholder="e.g. Alex Rivera"
+              value={formData.full_name}
               onChange={handleChange}
               required
             />
           </div>
 
           <div className="form-group">
-            <label htmlFor="tenant_slug">Tenant Slug (URL ID)</label>
+            <label htmlFor="tenant_slug">Tenant ID (Company URL)</label>
             <input
               id="tenant_slug"
               type="text"
@@ -70,18 +81,9 @@ const RegisterPage = () => {
               onChange={handleChange}
               required
             />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="full_name">Full Name</label>
-            <input
-              id="full_name"
-              type="text"
-              placeholder="Your Name"
-              value={formData.full_name}
-              onChange={handleChange}
-              required
-            />
+            <span style={{ fontSize: '0.7rem', color: 'var(--auth-text-muted)', marginTop: '-8px', display: 'block', paddingLeft: '4px' }}>
+              Used for your secure portal link.
+            </span>
           </div>
 
           <div className="form-group">
@@ -111,12 +113,12 @@ const RegisterPage = () => {
           {error && <div className="error-message">{error}</div>}
 
           <button type="submit" className="login-button" disabled={isLoading}>
-            {isLoading ? 'Creating Account...' : 'Register Tenant'}
+            {isLoading ? 'Preparing Environment...' : 'Start Now'}
           </button>
         </form>
 
         <div className="login-footer">
-          <p>Already have an account? <Link to="/login">Sign in</Link></p>
+          <p>Already registered? <Link to="/login">Sign in</Link></p>
         </div>
       </div>
     </div>

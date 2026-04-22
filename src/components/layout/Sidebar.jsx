@@ -25,7 +25,8 @@ const Sidebar = () => {
           <Truck size={24} color="var(--primary)" />
         )}
         <span style={{ color: 'white', fontWeight: '700' }}>
-          {selectedTenant?.name || 'GNS Billing'}
+          {selectedTenant?.name || 'Truck Billing'}
+
         </span>
       </div>
       
@@ -52,6 +53,7 @@ const Sidebar = () => {
           <Bell size={20} />
           <span>Notifications</span>
         </NavLink>
+
         <NavLink to="/payments" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
           <CreditCard size={20} />
           <span>Payments</span>
@@ -65,32 +67,16 @@ const Sidebar = () => {
         </NavLink>
         
         {user && (
-          <div className="user-profile" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div className="user-avatar">{user.full_name?.charAt(0) || 'U'}</div>
-              <div className="user-info">
-                <span className="user-name">{user.full_name}</span>
-                <span className="user-email">{user.email}</span>
-              </div>
+          <div className="user-profile">
+            <div className="user-avatar">{user.full_name?.charAt(0) || 'U'}</div>
+            <div className="user-info">
+              <span className="user-name">{user.full_name}</span>
+              <span className="user-email">{user.email}</span>
             </div>
             <button 
               onClick={logout} 
               className="logout-icon-btn" 
               title="Logout"
-              style={{ 
-                background: 'none', 
-                border: 'none', 
-                color: 'rgba(255,255,255,0.4)', 
-                cursor: 'pointer',
-                padding: '8px',
-                borderRadius: '6px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.2s',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.4)'; e.currentTarget.style.background = 'none'; }}
             >
               <LogOut size={18} />
             </button>

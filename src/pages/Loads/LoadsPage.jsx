@@ -6,6 +6,8 @@ import { useNavigate } from 'react-router-dom';
 import { FileUp, Search, FileSearch, Trash2, Box, Loader2 } from 'lucide-react';
 import DocumentUploadModal from '../../components/layout/DocumentUploadModal';
 
+import Pagination from '../../components/common/Pagination';
+
 const LoadsPage = () => {
   const { selectedTenantId } = useApp();
   const navigate = useNavigate();
@@ -13,15 +15,36 @@ const LoadsPage = () => {
   const [loading, setLoading] = useState(true);
   const [batching, setBatching] = useState(false);
   const [error, setError] = useState(null);
+  
+  // Pagination & Search State
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  
   const [selectedLoadDocs, setSelectedLoadDocs] = useState(null);
+
+  // Debounce search to avoid excessive API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPage(1); // Reset to page 1 for new searches
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   const fetchLoads = async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getLoads();
-      setLoads(data);
+      const data = await getLoads({
+        page,
+        page_size: pageSize,
+        search: debouncedSearch
+      });
+      setLoads(data.items || []);
+      setTotalItems(data.total || 0);
     } catch (err) {
       setError(err);
     } finally {
@@ -33,7 +56,7 @@ const LoadsPage = () => {
     if (selectedTenantId) {
       fetchLoads();
     }
-  }, [selectedTenantId, selectedLoadDocs === null]); // Refresh if modal closed
+  }, [selectedTenantId, page, debouncedSearch, selectedLoadDocs === null]);
 
   const handleDeleteLoad = async (loadId) => {
     if (window.confirm('Are you sure you want to delete this load?')) {
@@ -59,15 +82,13 @@ const LoadsPage = () => {
     }
   };
 
-  const filteredLoads = Array.isArray(loads) ? loads.filter(load => 
-    (load.reference_number?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-    (load.origin?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-    (load.destination?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-    (load.customer_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-    (load.broker_name?.toLowerCase() || '').includes(searchTerm.toLowerCase())
-  ) : [];
-
-  if (loading && loads.length === 0) return <div style={{ padding: '2rem' }}>Loading loads...</div>;
+  if (loading && loads.length === 0) return (
+    <div style={{ padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+      <Loader2 size={32} className="animate-spin" color="var(--primary)" />
+      <div style={{ color: 'var(--text-muted)' }}>Loading shipments...</div>
+    </div>
+  );
+  
   if (error) return <div style={{ padding: '2rem', color: 'var(--error)' }}>Error: {error.message}</div>;
 
   return (
@@ -160,7 +181,7 @@ const LoadsPage = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredLoads.map((load) => (
+            {loads.map((load) => (
               <tr key={load.id} style={{ borderBottom: '1px solid var(--border)' }}>
                 <td style={{ padding: '1rem', fontWeight: '600', color: 'var(--primary)' }}>
                   #{load.reference_number || 'N/A'}
@@ -212,15 +233,29 @@ const LoadsPage = () => {
                 </td>
               </tr>
             ))}
-            {filteredLoads.length === 0 && (
+            {loads.length === 0 && (
               <tr>
-                <td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  {searchTerm ? `No loads matching "${searchTerm}"` : 'No loads found.'}
+                <td colSpan="6" style={{ padding: '4rem', textAlign: 'center' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+                    <Search size={48} color="#e5e7eb" />
+                    <div style={{ color: 'var(--text-muted)', fontSize: '1rem' }}>
+                      {searchTerm ? `No loads matching "${searchTerm}"` : 'No loads found.'}
+                    </div>
+                  </div>
                 </td>
               </tr>
             )}
           </tbody>
         </table>
+        
+        <Pagination 
+          currentPage={page}
+          totalPages={Math.ceil(totalItems / pageSize)}
+          totalItems={totalItems}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          loading={loading}
+        />
       </div>
 
       <DocumentUploadModal 

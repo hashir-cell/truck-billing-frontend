@@ -10,7 +10,8 @@ const LandingPage = () => {
       <nav className="landing-nav animate-fade-in-down">
         <div className="landing-logo">
           <Truck size={28} className="logo-icon" />
-          <span className="logo-text">GNS Billing</span>
+          <span className="logo-text">Truck Billing</span>
+
         </div>
         <div className="landing-nav-actions">
           <Link to="/login" className="nav-login-btn">Log in</Link>
@@ -114,9 +115,11 @@ const LandingPage = () => {
         <div className="footer-content">
           <div className="footer-brand">
             <Truck size={24} color="#3b82f6" />
-            <span>GNS Billing</span>
+            <span>Truck Billing</span>
+
           </div>
-          <p className="footer-copy">© {new Date().getFullYear()} GNS Analytics. All rights reserved.</p>
+          <p className="footer-copy">© {new Date().getFullYear()} Truck Analytics. All rights reserved.</p>
+
         </div>
       </footer>
     </div>

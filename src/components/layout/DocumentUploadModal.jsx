@@ -13,7 +13,7 @@ const DocumentUploadModal = ({ load, onClose, onUploadSuccess }) => {
     { value: 'BOL', label: 'Bill of Lading' },
     { value: 'POD', label: 'Proof of Delivery' },
     { value: 'INVOICE', label: 'Invoice' },
-    { value: 'ACCESSORIAL_RECEIPT', label: 'Accessorial Receipt' },
+    { value: 'ACCESSORIAL_RECEIPT', label: 'Lumper / Accessorial Receipt' },
     { value: 'OTHER', label: 'Other' },
   ];
 

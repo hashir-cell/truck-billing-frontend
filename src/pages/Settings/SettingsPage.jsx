@@ -28,7 +28,7 @@ const GoogleLogo = () => (
 
 const SettingsPage = () => {
   const { selectedTenant, fetchTenants, selectedTenantId } = useApp();
-  const [activeTab, setActiveTab] = useState('communications');
+  const [activeTab, setActiveTab] = useState('messaging');
   const [loading, setLoading] = useState(false);
   const [showToken, setShowToken] = useState(false);
   
@@ -146,7 +146,7 @@ const SettingsPage = () => {
   }
 
   const sections = [
-    { id: 'communications', label: 'Communications', icon: <MessageSquare size={18} /> },
+    { id: 'messaging', label: 'SMS & Messaging', icon: <MessageSquare size={18} /> },
     { id: 'email', label: 'Email & API', icon: <Mail size={18} /> },
     { id: 'general', label: 'General', icon: <Settings size={18} /> },
     { id: 'security', label: 'Security', icon: <ShieldCheck size={18} /> }
@@ -192,7 +192,7 @@ const SettingsPage = () => {
         {/* Content Area */}
         <div className="card" style={{ padding: '2rem', minHeight: '500px', display: 'flex', flexDirection: 'column' }}>
           
-          {activeTab === 'communications' && (
+          {activeTab === 'messaging' && (
             <div className="fade-in">
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
                 <div style={{ padding: '0.5rem', borderRadius: '0.5rem', background: '#fef2f2', color: '#ef4444' }}>

@@ -18,7 +18,7 @@ import {
   Layers,
   ShieldCheck,
   Check,
-  MessageSquare
+  Bell,
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
@@ -166,8 +166,12 @@ const OrchestrationPage = () => {
       {currentStageId >= 0 && (
         <div style={{ marginBottom: '2rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.8125rem', fontWeight: '500', color: 'var(--text-muted)' }}>
-            <span>{currentStageId === 4 ? 'Pipeline completed successfully' : `Running stage ${currentStageId + 1} of 4: ${PIPELINE_STAGES[currentStageId].label}`}</span>
-            <span>{Math.round((currentStageId / 4) * 100)}%</span>
+            <span>
+              {currentStageId === 4 ? 'Pipeline completed successfully' : 
+               currentStageId === 5 ? 'Pipeline failed' : 
+               `Running stage ${currentStageId + 1} of 4: ${PIPELINE_STAGES[currentStageId]?.label || 'Initialising...'}`}
+            </span>
+            <span>{Math.round((Math.min(currentStageId, 4) / 4) * 100)}%</span>
           </div>
           <div style={{ width: '100%', height: '6px', background: 'var(--border)', borderRadius: '3px', overflow: 'hidden' }}>
             <div style={{ 
@@ -279,8 +283,8 @@ const OrchestrationPage = () => {
 
             <div className="card" style={{ padding: '1.5rem' }}>
                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
-                <MessageSquare size={18} color="var(--text-muted)" />
-                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--text-main)' }}>Communications</h3>
+                <Bell size={18} color="var(--text-muted)" />
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--text-main)' }}>Automated Alerts</h3>
               </div>
               <div style={{ height: '180px', width: '100%', position: 'relative' }}>
                  <ResponsiveContainer width="100%" height="100%">

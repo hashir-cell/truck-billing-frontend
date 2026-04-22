@@ -33,12 +33,13 @@ const Dashboard = () => {
       setLoading(true);
       setError(null);
       try {
-        const [summary, loads] = await Promise.all([
+        const [summary, loadsData] = await Promise.all([
           getDashboardSummary(),
           getLoads({ state: 'EXCEPTION' })
         ]);
         setData(summary);
-        setRecentExceptions(loads.slice(0, 4)); // Show up to 4 exceptions
+        setRecentExceptions(loadsData.items?.slice(0, 4) || []); // Show up to 4 exceptions
+
       } catch (err) {
         if (err.response?.status !== 401) {
           setError(err);
@@ -215,7 +216,8 @@ const Dashboard = () => {
             </h3>
           </div>
           
-          <div style={{ flex: 1, overflowY: 'auto' }}>
+          <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+
             {recentExceptions.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {recentExceptions.map((ex, index) => (
@@ -230,14 +232,15 @@ const Dashboard = () => {
                   }}
                   onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                  onClick={() => navigate(`/loads/${ex.id}`)}
+                  onClick={() => navigate(`/exceptions?loadId=${ex.id}`)}
                   >
                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444' }} />
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-main)' }}>Load #{ex.reference_number}</div>
-                      <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', margin: '0.125rem 0 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', margin: '0.125rem 0 0 0', lineHeight: '1.4' }}>
                         {ex.exception_reason || 'Verification Required'}
                       </p>
+
                     </div>
                     <ChevronRight size={16} color="var(--text-muted)" />
                   </div>

@@ -101,6 +101,28 @@ const LoadDetailsPage = () => {
     setEditedData(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleViewDocument = (storagePath) => {
+    // API base URL is http://127.0.0.1:8000
+    // storagePath is like "storage/documents/..."
+    const baseUrl = "http://127.0.0.1:8000";
+    const fullUrl = `${baseUrl}/${storagePath}`;
+    window.open(fullUrl, '_blank');
+  };
+
+  const formatDocType = (type) => {
+    const map = {
+      'RATE_CONFIRMATION': 'Rate Confirmation',
+      'BOL': 'BOL',
+      'POD': 'POD',
+      'INVOICE': 'Invoice',
+      'ACCESSORIAL_RECEIPT': 'Accessorial Receipt',
+      'DELIVERY_RECEIPT': 'Delivery Receipt',
+      'LUMPER_RECEIPT': 'Lumper Receipt',
+      'OTHER': 'Other'
+    };
+    return map[type] || type.replace('_', ' ');
+  };
+
   if (loading) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
@@ -394,13 +416,16 @@ const LoadDetailsPage = () => {
                         <FileText size={18} color="var(--primary)" />
                       </div>
                       <div>
-                        <p style={{ fontWeight: '700', fontSize: '0.875rem' }}>{doc.doc_type}</p>
+                        <p style={{ fontWeight: '700', fontSize: '0.875rem' }}>{formatDocType(doc.doc_type)}</p>
                         <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                           Uploaded {new Date(doc.created_at).toLocaleDateString()}
                         </p>
                       </div>
                     </div>
-                    <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)' }}>
+                    <button 
+                      onClick={() => handleViewDocument(doc.storage_path)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)' }}
+                    >
                       <ExternalLink size={16} />
                     </button>
                   </div>

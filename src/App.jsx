@@ -13,12 +13,14 @@ import LoadDetailsPage from './pages/Loads/LoadDetailsPage';
 import SettingsPage from './pages/Settings/SettingsPage';
 import NotificationCenter from './components/common/NotificationCenter';
 import NotificationHistoryPage from './pages/Notifications/NotificationHistoryPage';
+
 import LoginPage from './pages/Auth/LoginPage';
 import RegisterPage from './pages/Auth/RegisterPage';
 import LandingPage from './pages/Landing/LandingPage';
 import OnboardingPage from './pages/Auth/OnboardingPage';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 import PaymentsPage from './pages/Payments/PaymentsPage';
+import DriverUploadPage from './pages/Public/DriverUploadPage';
 import './styles/index.css';
 
 const AuthenticatedLayout = () => {
@@ -46,6 +48,7 @@ const AuthenticatedLayout = () => {
           <Route path="/tenants" element={<Tenant />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/notifications" element={<NotificationHistoryPage />} />
+
           <Route path="/payments" element={<PaymentsPage />} />
         </Routes>
       </main>
@@ -60,6 +63,7 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/driver-upload/:token" element={<DriverUploadPage />} />
         <Route element={<ProtectedRoute />}>
            <Route path="/onboarding" element={<OnboardingPage />} />
            <Route path="/*" element={<AuthenticatedLayout />} />

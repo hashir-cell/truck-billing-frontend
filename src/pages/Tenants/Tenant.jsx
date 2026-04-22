@@ -113,7 +113,8 @@ const Tenant = () => {
                   <td style={{ padding: '1.25rem 1.5rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-muted)' }}>
                       <Globe size={14} />
-                      <span>{tenant.slug}.gnsbilling.com</span>
+                      <span>{tenant.slug}.truckbilling.com</span>
+
                     </div>
                   </td>
                   <td style={{ padding: '1.25rem 1.5rem' }}>

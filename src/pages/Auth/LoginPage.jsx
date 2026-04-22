@@ -50,10 +50,12 @@ const LoginPage = () => {
       }}>
         
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '2rem', color: 'var(--primary)' }}>
-          <Truck size={36} strokeWidth={2.5} />
-          <h1 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.025em' }}>
-            GNS Billing
+        <div className="logo-section" style={{ marginBottom: '2.5rem' }}>
+          <div className="logo-icon">
+            <Truck size={32} strokeWidth={2.5} />
+          </div>
+          <h1 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.025em', marginTop: '1rem' }}>
+            Truck Billing
           </h1>
         </div>
         

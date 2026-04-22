@@ -131,11 +131,31 @@ const TenantSelector = () => {
                   }
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-                  <Building2 size={14} style={{ opacity: isActive ? 1 : 0.5 }} />
-                  <span>{tenant.name}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, overflow: 'hidden' }}>
+                  <Building2 size={16} style={{ opacity: isActive ? 1 : 0.5, flexShrink: 0 }} />
+                  <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                    <span style={{ 
+                      fontSize: '0.8125rem', 
+                      fontWeight: isActive ? '700' : '600',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}>
+                      {tenant.name}
+                    </span>
+                    <span style={{ 
+                      fontSize: '0.625rem', 
+                      opacity: 0.5,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}>
+                      {tenant.slug}.truckbilling.com
+                    </span>
+                  </div>
                 </div>
-                {isActive && <Check size={14} />}
+                {isActive && <Check size={14} style={{ flexShrink: 0, marginLeft: '0.5rem' }} />}
+
               </div>
             );
           })}

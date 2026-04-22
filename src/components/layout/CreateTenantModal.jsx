@@ -119,7 +119,8 @@ const CreateTenantModal = ({ isOpen, onClose, tenant = null }) => {
                     style={slugInputStyle}
                     required
                   />
-                  <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>.gnsbilling.com</span>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>.truckbilling.com</span>
+
                 </div>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
                   This creates a unique partitioned data slice for this client.

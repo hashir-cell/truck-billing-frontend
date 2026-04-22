@@ -142,7 +142,8 @@ const OnboardingPage = () => {
             <div className="fade-in">
               <div className="step-header">
                 <div className="step-icon"><Building2 size={32} /></div>
-                <h1>Welcome to GNS Billing</h1>
+                <h1>Welcome to Truck Billing</h1>
+
                 <p>Let's start by confirming your organization details.</p>
               </div>
               <div className="form-group-large">

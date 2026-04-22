@@ -55,10 +55,11 @@ export const getDashboardSummary = async (params) => {
 };
 
 export const getLoads = async (params) => {
-  try{
+  try {
+    // params can include: page, page_size, state, search, etc.
     const res = await apiClient.get("/loads", { params });
     return res.data;
-  }catch(error){
+  } catch (error) {
     console.error("Error fetching loads:", error);
     throw error;
   }
@@ -74,9 +75,10 @@ export const getLoad = async (loadId) => {
   }
 };
 
-export const getExceptions = async () => {
+export const getExceptions = async (params) => {
   const res = await apiClient.get("/loads", { 
     params: { 
+      ...params,
       state: 'EXCEPTION' 
     } 
   });
@@ -131,7 +133,7 @@ export const transitionLoad = (loadId, newState) => {
 export const triggerOrchestration = async (tenantSlug) => {
   const res = await apiClient.post("/runs/trigger", {
     tenant_slug: tenantSlug,
-    dispath_file: "",  // Empty as per user request
+    dispatch_file: "",  // Empty as per user request
     invoice_file: "",
     bank_statement_file: "",
     document_files: []
@@ -158,7 +160,7 @@ export const ingestDispatch = async (file) => {
 export const ingestInvoice = async (file) => {
   const formData = new FormData();
   formData.append('file', file);
-  const res = await apiClient.post("/ingest/inovice", formData, { // Backend has a typo 'inovice'
+  const res = await apiClient.post("/ingest/invoice", formData, { 
     headers: {
       'Content-Type': 'multipart/form-data',
     },
@@ -246,6 +248,30 @@ export const postBatchPayment = async (batchId, data) => {
 
 export const updateBrandingSettings = async (data) => {
   const res = await apiClient.patch("/branding/settings", data);
+  return res.data;
+};
+
+
+export const publicUploadDocument = async (token, file, docType) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('doc_type', docType);
+
+  const res = await axios.post(`${apiClient.defaults.baseURL}/public/upload/${token}/document`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return res.data;
+};
+
+export const getPublicLoadDetails = async (token) => {
+  const res = await axios.get(`${apiClient.defaults.baseURL}/public/load/${token}`);
+  return res.data;
+};
+
+export const addPublicLoadNote = async (token, noteData) => {
+  const res = await axios.post(`${apiClient.defaults.baseURL}/public/load/${token}/notes`, noteData);
   return res.data;
 };
 
