@@ -76,6 +76,18 @@ const SettingsPage = () => {
     }
   }, [selectedTenantId]);
 
+  // Real-time log polling
+  useEffect(() => {
+    let interval;
+    if (selectedTenantId && activeTab === 'automation') {
+      interval = setInterval(() => {
+        fetchAutomationLogs();
+        fetchAutomationSettings(); // Also refresh next run time
+      }, 5000);
+    }
+    return () => clearInterval(interval);
+  }, [selectedTenantId, activeTab]);
+
   const handleUpdateAutomation = async (interval) => {
     setAutomationLoading(true);
     try {

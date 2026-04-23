@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getDashboardSummary, getLoads, getAutomationSettings } from '../../services/api';
+import { getDashboardSummary, getLoads, getAutomationSettings, getAutomationLogs } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 import { 
   Truck, 
@@ -14,7 +14,8 @@ import {
   FileText,
   Activity,
   ArrowRight,
-  Zap
+  Zap,
+  History
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -28,20 +29,23 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [automation, setAutomation] = useState({ is_active: false, next_run: null });
+  const [automationLogs, setAutomationLogs] = useState([]);
   
   useEffect(() => {
     const fetchDashboard = async () => {
       setLoading(true);
       setError(null);
       try {
-        const [summary, loadsData, autoSettings] = await Promise.all([
+        const [summary, loadsData, autoSettings, logs] = await Promise.all([
           getDashboardSummary(),
           getLoads({ state: 'EXCEPTION' }),
-          getAutomationSettings()
+          getAutomationSettings(),
+          getAutomationLogs()
         ]);
         setData(summary);
         setRecentExceptions(loadsData.items?.slice(0, 4) || []); // Show up to 4 exceptions
         setAutomation(autoSettings);
+        setAutomationLogs(logs.slice(0, 5));
 
       } catch (err) {
         if (err.response?.status !== 401) {
@@ -55,6 +59,24 @@ const Dashboard = () => {
       fetchDashboard();
     }
   }, [selectedTenantId, isAuthenticated]);
+
+  // Real-time updates for Mission Control
+  useEffect(() => {
+    let interval;
+    if (selectedTenantId && isAuthenticated && automation.is_active) {
+      interval = setInterval(async () => {
+        try {
+          const [autoSettings, logs] = await Promise.all([
+            getAutomationSettings(),
+            getAutomationLogs()
+          ]);
+          setAutomation(autoSettings);
+          setAutomationLogs(logs.slice(0, 5));
+        } catch { /* silent */ }
+      }, 10000); // 10 seconds for dashboard
+    }
+    return () => clearInterval(interval);
+  }, [selectedTenantId, isAuthenticated, automation.is_active]);
 
   if (!selectedTenantId) return (
     <div style={{ padding: '6rem 2rem', textAlign: 'center', backgroundColor: 'white', borderRadius: '1rem', border: '1px solid var(--border)', maxWidth: '600px', margin: '4rem auto' }}>
@@ -181,49 +203,111 @@ const Dashboard = () => {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 350px', gap: '1.5rem' }}>
         
-        {/* Workflow Pulse */}
-        <div className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Activity size={18} color="var(--primary)" />
-              Automation Pipeline
-            </h3>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Updated Just Now</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* Workflow Pulse */}
+          <div className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Activity size={18} color="var(--primary)" />
+                Workflow Pipeline
+              </h3>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Real-time Pulse</span>
+            </div>
+            
+            <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'space-between', position: 'relative', padding: '0 1rem' }}>
+               {/* Background Line Connector */}
+               <div style={{ 
+                 position: 'absolute', top: '50%', left: '3rem', right: '3rem', 
+                 height: '2px', background: 'var(--border)', zIndex: 0, transform: 'translateY(-50%)'
+               }} />
+               
+               {workflowStages.map((stage, idx) => {
+                 const count = data?.by_state?.[stage.key] || 0;
+                 const isActive = count > 0;
+                 return (
+                   <div key={stage.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1, background: 'white', padding: '0 0.5rem' }}>
+                     <div style={{ 
+                       width: '40px', height: '40px', borderRadius: '12px',
+                       background: isActive ? 'var(--primary-light)' : '#f8fafc',
+                       border: `1px solid ${isActive ? 'var(--primary)' : 'var(--border)'}`,
+                       display: 'flex', alignItems: 'center', justifyContent: 'center',
+                       color: isActive ? 'var(--primary)' : 'var(--text-muted)',
+                       marginBottom: '0.75rem',
+                       transition: 'all 0.2s',
+                       boxShadow: isActive ? '0 4px 6px -1px rgba(37,99,235,0.1)' : 'none'
+                     }}>
+                       {stage.icon}
+                     </div>
+                     <div style={{ fontWeight: 700, fontSize: '1.125rem', color: isActive ? 'var(--text-main)' : 'var(--text-muted)', lineHeight: 1, marginBottom: '0.25rem' }}>
+                       {count}
+                     </div>
+                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                       {stage.label}
+                     </div>
+                   </div>
+                 );
+               })}
+            </div>
           </div>
-          
-          <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'space-between', position: 'relative', padding: '0 1rem' }}>
-             {/* Background Line Connector */}
-             <div style={{ 
-               position: 'absolute', top: '50%', left: '3rem', right: '3rem', 
-               height: '2px', background: 'var(--border)', zIndex: 0, transform: 'translateY(-50%)'
-             }} />
-             
-             {workflowStages.map((stage, idx) => {
-               const count = data?.by_state?.[stage.key] || 0;
-               const isActive = count > 0;
-               return (
-                 <div key={stage.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1, background: 'white', padding: '0 0.5rem' }}>
-                   <div style={{ 
-                     width: '40px', height: '40px', borderRadius: '12px',
-                     background: isActive ? 'var(--primary-light)' : '#f8fafc',
-                     border: `1px solid ${isActive ? 'var(--primary)' : 'var(--border)'}`,
-                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                     color: isActive ? 'var(--primary)' : 'var(--text-muted)',
-                     marginBottom: '0.75rem',
-                     transition: 'all 0.2s',
-                     boxShadow: isActive ? '0 4px 6px -1px rgba(37,99,235,0.1)' : 'none'
-                   }}>
-                     {stage.icon}
-                   </div>
-                   <div style={{ fontWeight: 700, fontSize: '1.125rem', color: isActive ? 'var(--text-main)' : 'var(--text-muted)', lineHeight: 1, marginBottom: '0.25rem' }}>
-                     {count}
-                   </div>
-                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                     {stage.label}
-                   </div>
-                 </div>
-               );
-             })}
+
+          {/* Automation Activity */}
+          <div className="card" style={{ padding: '0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border)', background: '#fffcf9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <History size={18} color="#f97316" />
+                Automation Activity
+              </h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span className="animate-pulse" style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f97316' }} />
+                <span style={{ fontSize: '0.75rem', color: '#f97316', fontWeight: '600' }}>Live Logs</span>
+              </div>
+            </div>
+            
+            <div style={{ padding: '0.5rem' }}>
+              {automationLogs.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  {automationLogs.map((log, idx) => (
+                    <div key={log.id} style={{ 
+                      padding: '0.875rem 1rem', 
+                      borderRadius: '0.5rem',
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center',
+                      background: idx % 2 === 0 ? 'transparent' : '#fffcf9',
+                      border: '1px solid transparent',
+                      transition: 'all 0.2s'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <div style={{ 
+                          width: '8px', height: '8px', borderRadius: '50%', 
+                          background: log.status === 'success' ? '#22c55e' : '#ef4444' 
+                        }} />
+                        <div>
+                          <div style={{ fontSize: '0.8125rem', fontWeight: '600', color: 'var(--text-main)' }}>
+                            Pipeline Run #{log.id.slice(0, 4)}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            {new Date(log.created_at).toLocaleTimeString()}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '0.8125rem', fontWeight: '700', color: log.status === 'success' ? '#166534' : '#991b1b' }}>
+                          {log.status === 'success' ? `+${log.loads_processed} Loads` : 'Failed'}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          {log.status === 'success' ? 'Completed' : (log.errors?.error?.slice(0, 20) || 'Error')}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+                  No recent automation activity.
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
