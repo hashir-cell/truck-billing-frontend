@@ -274,4 +274,15 @@ export const addPublicLoadNote = async (token, noteData) => {
   return res.data;
 };
 
+// -- Automation & Scheduler --
+export const getAutomationSettings = async () => {
+  const res = await apiClient.get('/automation/settings');
+  return res.data;
+};
+
+export const updateAutomationSettings = async (data) => {
+  const res = await apiClient.post('/automation/settings', data);
+  return res.data;
+};
+
 export default apiClient;

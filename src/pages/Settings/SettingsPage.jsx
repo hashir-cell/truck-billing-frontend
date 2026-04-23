@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { updateTenant, getGmailConnectUrl, getGmailStatus, disconnectGmail } from '../../services/api';
 import { 
   Settings, 
   MessageSquare, 
@@ -14,8 +13,11 @@ import {
   Cpu,
   Lock,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Clock,
+  Zap
 } from 'lucide-react';
+import { updateTenant, getGmailConnectUrl, getGmailStatus, disconnectGmail, getAutomationSettings, updateAutomationSettings } from '../../services/api';
 
 const GoogleLogo = () => (
   <svg width="20" height="20" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
@@ -35,16 +37,21 @@ const SettingsPage = () => {
   const [gmailStatus, setGmailStatus] = useState({ connected: false, email: null });
   const [gmailLoading, setGmailLoading] = useState(false);
 
-  const fetchGmailStatus = async () => {
+  // Automation state
+  const [automationSettings, setAutomationSettings] = useState({ interval_minutes: 0, is_active: false, next_run: null });
+  const [automationLoading, setAutomationLoading] = useState(false);
+
+  const fetchAutomationSettings = async () => {
     try {
-      const status = await getGmailStatus();
-      setGmailStatus(status);
+      const settings = await getAutomationSettings();
+      setAutomationSettings(settings);
     } catch { /* silent */ }
   };
 
   useEffect(() => {
     if (selectedTenantId) {
       fetchGmailStatus();
+      fetchAutomationSettings();
     }
     const params = new URLSearchParams(window.location.search);
     if (params.get('gmail') === 'connected') {
@@ -52,6 +59,18 @@ const SettingsPage = () => {
       setActiveTab('email');
     }
   }, [selectedTenantId]);
+
+  const handleUpdateAutomation = async (interval) => {
+    setAutomationLoading(true);
+    try {
+      const res = await updateAutomationSettings({ interval_minutes: interval });
+      setAutomationSettings(prev => ({ ...prev, interval_minutes: interval, is_active: interval > 0 }));
+    } catch (err) {
+      alert('Failed to update automation: ' + (err.response?.data?.detail || err.message));
+    } finally {
+      setAutomationLoading(false);
+    }
+  };
 
   const handleGmailConnect = async () => {
     setGmailLoading(true);
@@ -149,6 +168,7 @@ const SettingsPage = () => {
     { id: 'messaging', label: 'SMS & Messaging', icon: <MessageSquare size={18} /> },
     { id: 'email', label: 'Email & API', icon: <Mail size={18} /> },
     { id: 'general', label: 'General', icon: <Settings size={18} /> },
+    { id: 'automation', label: 'Pipeline Automation', icon: <Zap size={18} /> },
     { id: 'security', label: 'Security', icon: <ShieldCheck size={18} /> }
   ];
 
@@ -483,6 +503,102 @@ const SettingsPage = () => {
                       <option value="365">1 Year</option>
                     </select>
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'automation' && (
+            <div className="fade-in">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                <div style={{ padding: '0.5rem', borderRadius: '0.5rem', background: '#fff7ed', color: '#f97316' }}>
+                  <Zap size={24} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0 }}>Pipeline Automation</h3>
+                  <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-muted)' }}>Configure automatic document extraction and workflow execution.</p>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                {/* Status Card */}
+                <div style={{ 
+                  padding: '1.5rem', 
+                  borderRadius: '1rem', 
+                  background: automationSettings.is_active ? '#f0fdf4' : '#f9fafb',
+                  border: `1px solid ${automationSettings.is_active ? '#bbf7d0' : 'var(--border)'}`,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div style={{ 
+                      width: '12px', height: '12px', borderRadius: '50%', 
+                      background: automationSettings.is_active ? '#22c55e' : '#9ca3af',
+                      boxShadow: automationSettings.is_active ? '0 0 10px #22c55e' : 'none'
+                    }} />
+                    <div>
+                      <h4 style={{ margin: 0 }}>{automationSettings.is_active ? 'Auto-Processing Active' : 'Automation Disabled'}</h4>
+                      <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                        {automationSettings.is_active 
+                          ? `Next run scheduled for: ${new Date(automationSettings.next_run).toLocaleTimeString()}`
+                          : 'Manual trigger required to process pipeline.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Frequency Selector */}
+                <div>
+                  <h4 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Clock size={16} /> Run Frequency
+                  </h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.75rem' }}>
+                    {[
+                      { label: 'Off', val: 0 },
+                      { label: '15 Mins', val: 15 },
+                      { label: '30 Mins', val: 30 },
+                      { label: '1 Hour', val: 60 },
+                      { label: '4 Hours', val: 240 },
+                      { label: 'Daily', val: 1440 }
+                    ].map(opt => (
+                      <button
+                        key={opt.val}
+                        onClick={() => handleUpdateAutomation(opt.val)}
+                        disabled={automationLoading}
+                        style={{
+                          padding: '0.75rem',
+                          borderRadius: '0.75rem',
+                          border: `1px solid ${automationSettings.interval_minutes === opt.val ? 'var(--primary)' : 'var(--border)'}`,
+                          background: automationSettings.interval_minutes === opt.val ? 'var(--primary-light)' : 'white',
+                          color: automationSettings.interval_minutes === opt.val ? 'var(--primary)' : 'var(--text-main)',
+                          fontWeight: automationSettings.interval_minutes === opt.val ? '600' : '500',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          opacity: automationLoading ? 0.5 : 1
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ 
+                  padding: '1rem', 
+                  borderRadius: '0.75rem', 
+                  background: '#fffbeb', 
+                  border: '1px solid #fef3c7',
+                  fontSize: '0.875rem',
+                  color: '#92400e',
+                  display: 'flex',
+                  gap: '0.75rem'
+                }}>
+                  <AlertCircle size={20} style={{ flexShrink: 0 }} />
+                  <p style={{ margin: 0 }}>
+                    Automation will automatically poll your Gmail for Rate Confirmations and evaluate all 
+                    loads through the billing workflow steps.
+                  </p>
                 </div>
               </div>
             </div>
