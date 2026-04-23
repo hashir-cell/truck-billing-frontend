@@ -17,7 +17,7 @@ import {
   Clock,
   Zap
 } from 'lucide-react';
-import { updateTenant, getGmailConnectUrl, getGmailStatus, disconnectGmail, getAutomationSettings, updateAutomationSettings } from '../../services/api';
+import { updateTenant, getGmailConnectUrl, getGmailStatus, disconnectGmail, getAutomationSettings, updateAutomationSettings, getAutomationLogs } from '../../services/api';
 
 const GoogleLogo = () => (
   <svg width="20" height="20" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
@@ -40,6 +40,7 @@ const SettingsPage = () => {
   // Automation state
   const [automationSettings, setAutomationSettings] = useState({ interval_minutes: 0, is_active: false, next_run: null });
   const [automationLoading, setAutomationLoading] = useState(false);
+  const [automationLogs, setAutomationLogs] = useState([]);
 
   const fetchGmailStatus = async () => {
     try {
@@ -55,10 +56,18 @@ const SettingsPage = () => {
     } catch { /* silent */ }
   };
 
+  const fetchAutomationLogs = async () => {
+    try {
+      const logs = await getAutomationLogs();
+      setAutomationLogs(logs);
+    } catch { /* silent */ }
+  };
+
   useEffect(() => {
     if (selectedTenantId) {
       fetchGmailStatus();
       fetchAutomationSettings();
+      fetchAutomationLogs();
     }
     const params = new URLSearchParams(window.location.search);
     if (params.get('gmail') === 'connected') {
@@ -563,6 +572,8 @@ const SettingsPage = () => {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.75rem' }}>
                     {[
                       { label: 'Off', val: 0 },
+                      { label: '1 Min', val: 1 },
+                      { label: '2 Mins', val: 2 },
                       { label: '15 Mins', val: 15 },
                       { label: '30 Mins', val: 30 },
                       { label: '1 Hour', val: 60 },
@@ -606,6 +617,56 @@ const SettingsPage = () => {
                     Automation will automatically poll your Gmail for Rate Confirmations and evaluate all 
                     loads through the billing workflow steps.
                   </p>
+                </div>
+
+                {/* Logs Table */}
+                <div style={{ marginTop: '1rem' }}>
+                  <h4 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Cpu size={16} /> Automation Logs
+                  </h4>
+                  <div style={{ background: '#f8fafc', borderRadius: '0.75rem', border: '1px solid var(--border)', overflow: 'hidden' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
+                      <thead style={{ background: '#f1f5f9', borderBottom: '1px solid var(--border)' }}>
+                        <tr>
+                          <th style={{ textAlign: 'left', padding: '0.75rem' }}>Time</th>
+                          <th style={{ textAlign: 'left', padding: '0.75rem' }}>Status</th>
+                          <th style={{ textAlign: 'left', padding: '0.75rem' }}>Loads</th>
+                          <th style={{ textAlign: 'left', padding: '0.75rem' }}>Details</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {automationLogs.length > 0 ? automationLogs.map(log => (
+                          <tr key={log.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                            <td style={{ padding: '0.75rem' }}>{new Date(log.created_at).toLocaleString()}</td>
+                            <td style={{ padding: '0.75rem' }}>
+                              <span style={{ 
+                                padding: '0.125rem 0.5rem', 
+                                borderRadius: '1rem', 
+                                background: log.status === 'success' ? '#dcfce7' : '#fee2e2',
+                                color: log.status === 'success' ? '#166534' : '#991b1b',
+                                fontSize: '0.75rem',
+                                fontWeight: '600'
+                              }}>
+                                {log.status.toUpperCase()}
+                              </span>
+                            </td>
+                            <td style={{ padding: '0.75rem' }}>{log.loads_processed}</td>
+                            <td style={{ padding: '0.75rem', color: 'var(--text-muted)' }}>
+                              {log.status === 'success' 
+                                ? `Processed ${log.loads_processed} loads` 
+                                : log.errors?.error || 'Unknown error'}
+                            </td>
+                          </tr>
+                        )) : (
+                          <tr>
+                            <td colSpan="4" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                              No automation logs found.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>

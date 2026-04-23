@@ -280,6 +280,11 @@ export const getAutomationSettings = async () => {
   return res.data;
 };
 
+export const getAutomationLogs = async () => {
+  const res = await apiClient.get('/automation/logs');
+  return res.data;
+};
+
 export const updateAutomationSettings = async (data) => {
   const res = await apiClient.post('/automation/settings', data);
   return res.data;

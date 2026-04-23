@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getDashboardSummary, getLoads } from '../../services/api';
+import { getDashboardSummary, getLoads, getAutomationSettings } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 import { 
   Truck, 
@@ -13,10 +13,10 @@ import {
   Loader2,
   FileText,
   Activity,
-  ArrowRight
+  ArrowRight,
+  Zap
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-
 import { useAuth } from '../../context/AuthContext';
 
 const Dashboard = () => {
@@ -27,18 +27,21 @@ const Dashboard = () => {
   const [recentExceptions, setRecentExceptions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [automation, setAutomation] = useState({ is_active: false, next_run: null });
   
   useEffect(() => {
     const fetchDashboard = async () => {
       setLoading(true);
       setError(null);
       try {
-        const [summary, loadsData] = await Promise.all([
+        const [summary, loadsData, autoSettings] = await Promise.all([
           getDashboardSummary(),
-          getLoads({ state: 'EXCEPTION' })
+          getLoads({ state: 'EXCEPTION' }),
+          getAutomationSettings()
         ]);
         setData(summary);
         setRecentExceptions(loadsData.items?.slice(0, 4) || []); // Show up to 4 exceptions
+        setAutomation(autoSettings);
 
       } catch (err) {
         if (err.response?.status !== 401) {
@@ -98,9 +101,26 @@ const Dashboard = () => {
             Metrics and operational standing for {selectedTenant?.name || 'the organization'}.
           </p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.375rem 0.875rem', background: '#ecfdf5', borderRadius: '2rem', border: '1px solid #a7f3d0', fontSize: '0.8125rem', fontWeight: '600', color: '#10b981' }}>
-          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} />
-          System Operational
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          {automation.is_active && (
+            <div 
+              onClick={() => navigate('/settings')}
+              style={{ 
+                display: 'flex', alignItems: 'center', gap: '0.5rem', 
+                padding: '0.375rem 0.875rem', background: '#fff7ed', 
+                borderRadius: '2rem', border: '1px solid #fed7aa', 
+                fontSize: '0.8125rem', fontWeight: '600', color: '#ea580c',
+                cursor: 'pointer'
+              }}
+            >
+              <Zap size={14} fill="#ea580c" />
+              Auto-Pilot: Next run {new Date(automation.next_run).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </div>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.375rem 0.875rem', background: '#ecfdf5', borderRadius: '2rem', border: '1px solid #a7f3d0', fontSize: '0.8125rem', fontWeight: '600', color: '#10b981' }}>
+            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b981' }} />
+            System Operational
+          </div>
         </div>
       </div>
 
