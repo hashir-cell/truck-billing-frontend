@@ -1,5 +1,6 @@
 {
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/api/(.*)", "destination": "http://localhost:8000/api/$1" },
+    { "source": "/((?!assets/|favicon.ico|vite.svg).*)", "destination": "/index.html" }
   ]
-}
+}
