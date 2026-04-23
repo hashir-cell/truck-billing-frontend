@@ -255,7 +255,7 @@ export const publicUploadDocument = async (token, file, docType) => {
   formData.append('file', file);
   formData.append('doc_type', docType);
 
-  const res = await axios.post(`${apiClient.defaults.baseURL}/public/upload/${token}/document`, formData, {
+  const res = await apiClient.post(`/public/upload/${token}/document`, formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
@@ -264,12 +264,12 @@ export const publicUploadDocument = async (token, file, docType) => {
 };
 
 export const getPublicLoadDetails = async (token) => {
-  const res = await axios.get(`${apiClient.defaults.baseURL}/public/load/${token}`);
+  const res = await apiClient.get(`/public/load/${token}`);
   return res.data;
 };
 
 export const addPublicLoadNote = async (token, noteData) => {
-  const res = await axios.post(`${apiClient.defaults.baseURL}/public/load/${token}/notes`, noteData);
+  const res = await apiClient.post(`/public/load/${token}/notes`, noteData);
   return res.data;
 };
 
