@@ -41,6 +41,13 @@ const SettingsPage = () => {
   const [automationSettings, setAutomationSettings] = useState({ interval_minutes: 0, is_active: false, next_run: null });
   const [automationLoading, setAutomationLoading] = useState(false);
 
+  const fetchGmailStatus = async () => {
+    try {
+      const status = await getGmailStatus();
+      setGmailStatus(status);
+    } catch { /* silent */ }
+  };
+
   const fetchAutomationSettings = async () => {
     try {
       const settings = await getAutomationSettings();
