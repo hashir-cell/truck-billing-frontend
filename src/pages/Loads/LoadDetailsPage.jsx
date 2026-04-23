@@ -320,9 +320,19 @@ const LoadDetailsPage = () => {
               <DollarSign size={20} color="#059669" />
               Financial Breakdown
             </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1.5rem' }}>
               <div style={finItemStyle}>
-                <span style={labelStyle}>Total Revenue</span>
+                <span style={labelStyle}>Freight Revenue</span>
+                <span style={{ ...valueStyle, fontSize: '1.1rem' }}>${load.freight_revenue?.toLocaleString() || '0.00'}</span>
+              </div>
+              <div style={finItemStyle}>
+                <span style={labelStyle}>Accessorial Revenue</span>
+                <span style={{ ...valueStyle, fontSize: '1.1rem', color: load.accessorial_revenue > 0 ? '#8b5cf6' : 'var(--text-muted)' }}>
+                  ${load.accessorial_revenue?.toLocaleString() || '0.00'}
+                </span>
+              </div>
+              <div style={finItemStyle}>
+                <span style={labelStyle}>Total Target</span>
                 {isEditing ? (
                   <input 
                     type="number"

@@ -8,7 +8,7 @@ const DocumentUploadModal = ({ load, onClose, onUploadSuccess }) => {
 
   if (!load) return null;
 
-  const docTypes = [
+  const allDocTypes = [
     { value: 'RATE_CONFIRMATION', label: 'Rate Confirmation' },
     { value: 'BOL', label: 'Bill of Lading' },
     { value: 'POD', label: 'Proof of Delivery' },
@@ -16,6 +16,10 @@ const DocumentUploadModal = ({ load, onClose, onUploadSuccess }) => {
     { value: 'ACCESSORIAL_RECEIPT', label: 'Lumper / Accessorial Receipt' },
     { value: 'OTHER', label: 'Other' },
   ];
+
+  const docTypes = allDocTypes.filter(t => 
+    t.value !== 'ACCESSORIAL_RECEIPT' || (load.accessorial_revenue > 0)
+  );
 
   const handleDocumentUpload = async (file) => {
     return await ingestDocument(file, docType, load.id);
