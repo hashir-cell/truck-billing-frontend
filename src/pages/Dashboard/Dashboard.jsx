@@ -292,11 +292,15 @@ const Dashboard = () => {
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '0.8125rem', fontWeight: '700', color: log.status === 'success' ? '#166534' : '#991b1b' }}>
-                          {log.status === 'success' ? `+${log.loads_processed} Loads` : 'Failed'}
+                        <div style={{ 
+                          fontSize: '0.8125rem', 
+                          fontWeight: '700', 
+                          color: log.status === 'success' ? '#166534' : (log.status === 'running' ? '#2563eb' : '#991b1b') 
+                        }}>
+                          {log.status === 'success' ? `+${log.loads_processed} Loads` : (log.status === 'running' ? 'In Progress' : 'Failed')}
                         </div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                          {log.status === 'success' ? 'Completed' : (log.errors?.error?.slice(0, 20) || 'Error')}
+                          {log.status === 'success' ? 'Completed' : (log.status === 'running' ? 'Processing data...' : (log.errors?.error?.slice(0, 20) || 'Error'))}
                         </div>
                       </div>
                     </div>

@@ -21,7 +21,13 @@ import OnboardingPage from './pages/Auth/OnboardingPage';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 import PaymentsPage from './pages/Payments/PaymentsPage';
 import DriverUploadPage from './pages/Public/DriverUploadPage';
+import { useParams } from 'react-router-dom';
 import './styles/index.css';
+
+const BatchReviewRedirect = () => {
+  const { token } = useParams();
+  return <Navigate to={`/payments?review_token=${token}`} replace />;
+};
 
 const AuthenticatedLayout = () => {
   const { logout } = useAuth();
@@ -66,6 +72,7 @@ function App() {
         <Route path="/driver-upload/:token" element={<DriverUploadPage />} />
         <Route element={<ProtectedRoute />}>
            <Route path="/onboarding" element={<OnboardingPage />} />
+           <Route path="/batch-review/:token" element={<BatchReviewRedirect />} />
            <Route path="/*" element={<AuthenticatedLayout />} />
         </Route>
       </Routes>

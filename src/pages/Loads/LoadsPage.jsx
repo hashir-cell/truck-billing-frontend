@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { getLoads, deleteLoad, assembleBatch } from '../../services/api';
+import { getLoads, deleteLoad } from '../../services/api';
 import StatusBadge from '../../components/common/StatusBadge';
 import { useApp } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { FileUp, Search, FileSearch, Trash2, Box, Loader2 } from 'lucide-react';
+import { FileUp, Search, FileSearch, Trash2, Loader2 } from 'lucide-react';
 import DocumentUploadModal from '../../components/layout/DocumentUploadModal';
 
 import Pagination from '../../components/common/Pagination';
@@ -13,7 +13,7 @@ const LoadsPage = () => {
   const navigate = useNavigate();
   const [loads, setLoads] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [batching, setBatching] = useState(false);
+
   const [error, setError] = useState(null);
   
   // Pagination & Search State
@@ -69,18 +69,7 @@ const LoadsPage = () => {
     }
   };
 
-  const handleAssembleBatch = async () => {
-    setBatching(true);
-    try {
-      const res = await assembleBatch();
-      alert(`Successfully assembled batch ${res.batch_number} with ${res.invoice_count} invoices.`);
-      await fetchLoads();
-    } catch (err) {
-      alert('Failed to assemble batch: ' + (err.response?.data?.detail || err.message));
-    } finally {
-      setBatching(false);
-    }
-  };
+
 
   if (loading && loads.length === 0) return (
     <div style={{ padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
@@ -96,26 +85,7 @@ const LoadsPage = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
         <h1>Loads Management</h1>
         <div style={{ display: 'flex', gap: '1rem' }}>
-          <button 
-            onClick={handleAssembleBatch}
-            disabled={batching}
-            className="button-secondary" 
-            style={{ 
-              backgroundColor: 'var(--success-bg)', 
-              color: 'var(--success)', 
-              border: '1px solid var(--success)', 
-              padding: '0.625rem 1.25rem', 
-              borderRadius: '0.5rem',
-              fontWeight: '600',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}
-          >
-            {batching ? <Loader2 size={18} className="animate-spin" /> : <Box size={18} />}
-            Batch Ready Loads
-          </button>
+
           
           <button 
             onClick={() => navigate('/ingestion')}

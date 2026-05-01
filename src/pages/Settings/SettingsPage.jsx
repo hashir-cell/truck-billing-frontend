@@ -531,6 +531,21 @@ const SettingsPage = () => {
                       <option value="365">1 Year</option>
                     </select>
                   </div>
+
+                  <div className="form-group">
+                    <label>Minimum Batch Size</label>
+                    <input 
+                      type="number" 
+                      min="1"
+                      max="100"
+                      placeholder="10"
+                      value={formData.general?.batch_size || ''}
+                      onChange={(e) => handleInputChange('general', 'batch_size', e.target.value)}
+                    />
+                    <small style={{ color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                      Orchestration will only create a batch once at least this many loads are Ready for Invoice.
+                    </small>
+                  </div>
                 </div>
               </div>
             </div>

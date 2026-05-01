@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { getBatches, postBatchPayment } from '../../services/api';
+import axios from 'axios';
+import { getBatches, postBatchPayment, confirmPublicBatch, cancelPublicBatch } from '../../services/api';
+import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { 
   CreditCard, 
@@ -15,7 +17,8 @@ import {
   X,
   Loader2,
   Calendar,
-  Download
+  Download,
+  Box
 } from 'lucide-react';
 
 const PaymentsPage = () => {
@@ -25,6 +28,9 @@ const PaymentsPage = () => {
     const [isPosting, setIsPosting] = useState(false);
     const [selectedBatch, setSelectedBatch] = useState(null);
     const [showPayModal, setShowPayModal] = useState(false);
+    const [showReviewModal, setShowReviewModal] = useState(false);
+    const [isConfirming, setIsConfirming] = useState(false);
+    const [searchParams, setSearchParams] = useSearchParams();
     
     // Posting form state
     const [postData, setPostData] = useState({
@@ -41,7 +47,7 @@ const PaymentsPage = () => {
             const data = await getBatches();
             // Filter batches that are submitted or later
             const paymentRelevant = data.filter(b => 
-                ['SUBMITTED', 'ACCEPTED', 'PARTIALLY_PAID', 'PAID', 'REJECTED'].includes(b.state)
+                ['PENDING_CONFIRMATION', 'CONFIRMATION', 'READY', 'ASSEMBLING', 'BATCH_READY', 'SUBMITTED', 'ACCEPTED', 'PARTIALLY_PAID', 'PAID', 'REJECTED', 'CANCELLED'].includes(b.state)
             );
             setBatches(paymentRelevant);
         } catch (err) {
@@ -54,6 +60,21 @@ const PaymentsPage = () => {
     useEffect(() => {
         fetchData();
     }, [selectedTenant]);
+
+    useEffect(() => {
+        const reviewToken = searchParams.get('review_token');
+        if (reviewToken && batches.length > 0) {
+            const targetBatch = batches.find(b => b.confirmation_token === reviewToken);
+            if (targetBatch && targetBatch.state === 'PENDING_CONFIRMATION') {
+                setSelectedBatch(targetBatch);
+                setShowReviewModal(true);
+                // Clear the param after opening so it doesn't reopen on refresh
+                const newParams = new URLSearchParams(searchParams);
+                newParams.delete('review_token');
+                setSearchParams(newParams);
+            }
+        }
+    }, [searchParams, batches]);
 
     const handleOpenPostModal = (batch) => {
         setSelectedBatch(batch);
@@ -81,6 +102,37 @@ const PaymentsPage = () => {
         }
     };
 
+    const handleConfirmReview = async () => {
+        if (!selectedBatch) return;
+        setIsConfirming(true);
+        try {
+            await confirmPublicBatch(selectedBatch.confirmation_token, 0, postData.payment_date);
+            setShowReviewModal(false);
+            await fetchData();
+        } catch (err) {
+            alert("Failed to confirm batch. Please try again.");
+        } finally {
+            setIsConfirming(false);
+        }
+    };
+
+    const handleCancelReview = async () => {
+        if (!selectedBatch) return;
+        const reason = prompt("Please provide a reason for cancellation:");
+        if (reason === null) return; // User cancelled prompt
+
+        setIsConfirming(true);
+        try {
+            await cancelPublicBatch(selectedBatch.confirmation_token, reason || "Cancelled by owner");
+            setShowReviewModal(false);
+            await fetchData();
+        } catch (err) {
+            alert("Failed to cancel batch. Please try again.");
+        } finally {
+            setIsConfirming(false);
+        }
+    };
+
     const calculateMetrics = () => {
         const receivables = batches
             .filter(b => b.state === 'SUBMITTED' || b.state === 'ACCEPTED')
@@ -102,9 +154,12 @@ const PaymentsPage = () => {
         let icon = <Clock size={12} />;
         
         if (state === 'PAID') { color = '#10b981'; icon = <CheckCircle2 size={12} />; }
+        if (state === 'BATCH_READY' || state === 'READY' || state === 'ASSEMBLING') { color = '#f59e0b'; icon = <Box size={12} />; }
+        if (state === 'PENDING_CONFIRMATION') { color = '#6366f1'; icon = <AlertCircle size={12} />; }
+        if (state === 'CONFIRMATION') { color = '#8b5cf6'; icon = <CheckCircle2 size={12} />; }
         if (state === 'SUBMITTED') { color = '#3b82f6'; icon = <TrendingUp size={12} />; }
         if (state === 'ACCEPTED') { color = '#6366f1'; icon = <FileSearch size={12} />; }
-        if (state === 'REJECTED') { color = '#ef4444'; icon = <AlertCircle size={12} />; }
+        if (state === 'REJECTED' || state === 'CANCELLED') { color = '#ef4444'; icon = <AlertCircle size={12} />; }
         
         return (
             <span style={{
@@ -250,7 +305,19 @@ const PaymentsPage = () => {
                                     <StatusBadge state={batch.state} />
                                 </td>
                                 <td style={{ padding: '1.25rem 1.5rem' }}>
-                                    {['SUBMITTED', 'ACCEPTED', 'PARTIALLY_PAID'].includes(batch.state) ? (
+                                    {batch.state === 'PENDING_CONFIRMATION' ? (
+                                        <button 
+                                            className="button-primary" 
+                                            style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem', backgroundColor: '#6366f1' }}
+                                            onClick={() => {
+                                                setSelectedBatch(batch);
+                                                setPostData(prev => ({...prev, payment_date: new Date().toISOString().split('T')[0]}));
+                                                setShowReviewModal(true);
+                                            }}
+                                        >
+                                            Review & Release
+                                        </button>
+                                    ) : ['SUBMITTED', 'ACCEPTED', 'PARTIALLY_PAID'].includes(batch.state) ? (
                                         <button 
                                             className="button-primary" 
                                             style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}
@@ -366,6 +433,87 @@ const PaymentsPage = () => {
                     </div>
                 </div>
             )}
+            {/* Review & Release Modal */}
+            {showReviewModal && (
+                <div className="modal-overlay">
+                    <div className="modal-content" style={{ maxWidth: '450px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                <div style={{ width: '32px', height: '32px', background: '#eef2ff', color: '#6366f1', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <FileSearch size={18} />
+                                </div>
+                                <h3 style={{ margin: 0, fontSize: '1.125rem' }}>Review & Release Batch</h3>
+                            </div>
+                            <button className="icon-button" onClick={() => setShowReviewModal(false)}><X size={20}/></button>
+                        </div>
+
+                        <div style={{ fontSize: '0.875rem', background: '#f8fafc', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', border: '1px solid var(--border)' }}>
+                            <div style={{ color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Batch Summary</div>
+                            <div style={{ fontWeight: '700', fontSize: '1rem' }}>{selectedBatch?.batch_number}</div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '0.75rem' }}>
+                                <div>
+                                    <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Invoices</div>
+                                    <strong>{selectedBatch?.invoice_count}</strong>
+                                </div>
+                                <div>
+                                    <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Total Amount</div>
+                                    <strong>${selectedBatch?.total_amount?.toLocaleString()}</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="form-group">
+                            <label>Target Release Date</label>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                                Select the date you want this batch to be officially submitted for payment.
+                            </p>
+                            <div style={{ position: 'relative' }}>
+                                <Calendar size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                                <input 
+                                    type="date" 
+                                    style={{ paddingLeft: '2.5rem' }}
+                                    value={postData.payment_date}
+                                    onChange={e => setPostData({...postData, payment_date: e.target.value})}
+                                    min={new Date().toISOString().split('T')[0]}
+                                />
+                            </div>
+                        </div>
+
+                        <div style={{ marginTop: '1.5rem', padding: '1rem', background: '#fffbeb', borderRadius: '8px', border: '1px solid #fef3c7', fontSize: '0.8125rem', color: '#92400e' }}>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                                <span>Once confirmed, the batch will move to <strong>CONFIRMATION</strong> and will be automatically submitted once the release date is reached.</span>
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '2rem' }}>
+                            <button className="button-secondary" style={{ flex: 0.5, border: '1px solid var(--border)' }} onClick={() => setShowReviewModal(false)}>Back</button>
+                            <button 
+                                className="button-secondary" 
+                                style={{ 
+                                    flex: 1, 
+                                    color: '#ef4444', 
+                                    border: '1px solid #fee2e2',
+                                    fontWeight: '600'
+                                }} 
+                                onClick={handleCancelReview}
+                                disabled={isConfirming}
+                            >
+                                Cancel Batch
+                            </button>
+                            <button 
+                                className="button-primary" 
+                                style={{ flex: 1.5, backgroundColor: '#6366f1' }} 
+                                onClick={handleConfirmReview}
+                                disabled={isConfirming}
+                            >
+                                {isConfirming ? <Loader2 size={18} className="animate-spin" /> : 'Confirm & Release'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
 
             <style dangerouslySetInnerHTML={{ __html: `
                 .animate-in { animation: slideUp 0.4s ease-out; }

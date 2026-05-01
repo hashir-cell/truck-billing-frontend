@@ -84,6 +84,16 @@ export const getExceptions = async (params) => {
   return res.data;
 };
 
+export const getExceptionStats = async () => {
+  const res = await apiClient.get("/exceptions/stats");
+  return res.data;
+};
+
+export const getAllLoadReferences = async (params) => {
+  const res = await apiClient.get("/loads/all-references", { params });
+  return res.data;
+};
+
 export const resolveException = async (loadId, resolution, targetState = 'RESOLVED') => {
   const res = await apiClient.post(`/loads/${loadId}/transition`, {
     new_state: targetState,
@@ -287,6 +297,35 @@ export const getAutomationLogs = async () => {
 
 export const updateAutomationSettings = async (data) => {
   const res = await apiClient.post('/automation/settings', data);
+  return res.data;
+};
+
+export const batchResolveLoads = async (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await apiClient.post("/loads/batch-resolve", formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return res.data;
+};
+
+// -- Public Batch Review & Confirmation --
+// Legacy support for internal app calls using the confirmation token
+
+export const confirmPublicBatch = async (token, releaseDelayDays, releaseDate) => {
+  const res = await apiClient.post(`/batches/public/${token}/confirm`, {
+    release_delay_days: releaseDelayDays,
+    release_date: releaseDate
+  });
+  return res.data;
+};
+
+export const cancelPublicBatch = async (token, reason) => {
+  const res = await apiClient.post(`/batches/public/${token}/cancel`, {
+    reason: reason
+  });
   return res.data;
 };
 

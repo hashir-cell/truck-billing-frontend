@@ -24,4 +24,8 @@ dist-ssr
 *.sw?
 
 .env.production
-
+.agents
+.firebase
+firebase.json
+firebase-hosting-merge.yml
+firebase-hosting-pull-request.yml

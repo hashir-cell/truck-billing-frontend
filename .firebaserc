@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "default": "trucking-billing-engine",
+    "prod": "trucking-billing-engine"
+  },
+  "targets": {},
+  "etags": {}
+}

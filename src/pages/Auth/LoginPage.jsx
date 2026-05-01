@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Truck, Mail, Lock, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import './Auth.css'; // Keep for legacy sidebar styles if present
@@ -11,6 +11,7 @@ const LoginPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -19,7 +20,9 @@ const LoginPage = () => {
 
     try {
       await login(email, password);
-      navigate('/dashboard');
+      const from = location.state?.from;
+      const target = from ? `${from.pathname}${from.search}` : '/dashboard';
+      navigate(target, { replace: true });
     } catch (err) {
       console.error('Login failed:', err);
       setError(err.response?.data?.detail || 'Invalid email or password. Please try again.');

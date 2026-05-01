@@ -11,9 +11,12 @@ import {
   FileText,
   MessageSquare,
   User,
-  Clock
+  Clock,
+  XCircle,
+  FileUp,
+  Upload
 } from 'lucide-react';
-import { getExceptions, resolveException, updateLoad } from '../../services/api';
+import { getExceptions, getExceptionStats, resolveException, updateLoad, ingestInvoice, batchResolveLoads, getLoad } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 import Pagination from '../../components/common/Pagination';
 
@@ -29,25 +32,33 @@ const ExceptionsPage = () => {
 
   // Pagination & Search State
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(6); // 6 per page for the grid view
+  const [pageSize] = useState(6);
   const [totalItems, setTotalItems] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   
   // New state for contact info resolution
   const [contactInfo, setContactInfo] = useState({
-    broker_name: '',
-    broker_email: '',
-    broker_phone: '',
-    driver_name: '',
-    driver_phone: ''
+    broker_name: '', broker_email: '', broker_phone: '',
+    driver_name: '', driver_phone: ''
   });
 
   // State for amount mismatch resolution
   const [financials, setFinancials] = useState({
-    freight_revenue: 0,
-    invoice_amount: 0
+    freight_revenue: 0, invoice_amount: 0
   });
+
+  const [stats, setStats] = useState({ total: 0, missing_contact: 0, missing_invoice: 0, amount_mismatch: 0 });
+  const [showBatchHub, setShowBatchHub] = useState(false);
+
+  const fetchStats = async () => {
+    try {
+      const data = await getExceptionStats();
+      setStats(data);
+    } catch (err) {
+      console.error("Failed to fetch exception stats", err);
+    }
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -55,10 +66,11 @@ const ExceptionsPage = () => {
       const data = await getExceptions({
         page,
         page_size: pageSize,
-        search: debouncedSearch
+        search: debouncedSearch.trim()
       });
       setExceptions(data.items || []);
       setTotalItems(data.total || 0);
+      fetchStats();
     } catch (err) {
       setError(err);
     } finally {
@@ -83,15 +95,28 @@ const ExceptionsPage = () => {
 
   // Deep linking logic: Auto-select exception from URL
   useEffect(() => {
-    if (exceptions.length > 0) {
-      const loadId = searchParams.get('loadId');
-      if (loadId && !selectedException) {
-        const found = exceptions.find(ex => String(ex.id) === loadId);
-        if (found) {
-          setSelectedException(found);
+    const loadId = searchParams.get('loadId');
+    if (!loadId || selectedException) return;
+
+    const findAndSelect = async () => {
+      // 1. Try finding in current list
+      const found = exceptions.find(ex => String(ex.id) === loadId);
+      if (found) {
+        setSelectedException(found);
+      } else {
+        // 2. Not in list (maybe on another page), fetch it specifically
+        try {
+          const fetched = await getLoad(loadId);
+          if (fetched && fetched.state === 'EXCEPTION') {
+            setSelectedException(fetched);
+          }
+        } catch (err) {
+          console.error("Failed to fetch deep-linked exception", err);
         }
       }
-    }
+    };
+
+    findAndSelect();
   }, [exceptions, searchParams, selectedException]);
 
   useEffect(() => {
@@ -115,7 +140,11 @@ const ExceptionsPage = () => {
     selectedException?.exception_data?.type === 'MISSING_CONTACT_INFO' ||
     selectedException?.exception_reason?.includes('Missing');
 
-  const isAmountException = 
+  const isInvoiceMissingException = 
+    selectedException?.exception_data?.type === 'MISSING_INVOICE_CSV' ||
+    selectedException?.exception_reason?.includes('Invoice CSV missing');
+
+    const isAmountException = 
     selectedException?.exception_data?.type === 'AMOUNT_MISMATCH' ||
     selectedException?.exception_reason?.includes('Amount mismatch');
 
@@ -141,9 +170,8 @@ const ExceptionsPage = () => {
 
 
       // 2. Resolve the exception (return to previous state)
-      // We use 'DOCS_PENDING' as default target state for these exceptions
       const targetState = selectedException.previous_state || 'DOCS_PENDING';
-      await resolveException(selectedException.id, resolutionNote || "Contact information updated", targetState);
+      await resolveException(selectedException.id, resolutionNote || "Details updated", targetState);
       
       setSelectedException(null);
       fetchData();
@@ -155,21 +183,95 @@ const ExceptionsPage = () => {
     }
   };
 
-  if (loading) return <div style={{ padding: '2rem' }}>Loading exceptions...</div>;
+  const handleBatchUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setLoading(true);
+    try {
+      const res = await batchResolveLoads(file);
+      alert(`Successfully resolved ${res.resolved_count} loads via batch upload.`);
+      fetchData();
+    } catch (err) {
+      console.error('Batch resolution failed', err);
+      alert('Failed to process batch resolution. Please check the file format.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', position: 'relative', minHeight: '80vh' }}>
-      <div style={{ marginBottom: '2rem' }}>
-        <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '2rem' }}>
-          <AlertTriangle size={32} color="#f59e0b" />
-          Exception Center
-        </h1>
-        <p style={{ color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-          Review and resolve billing discrepancies and documentation flags.
-        </p>
+    <div style={{ maxWidth: '1200px', margin: '0 auto', position: 'relative', minHeight: '80vh', paddingBottom: '4rem' }}>
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'flex-end', 
+        marginBottom: '2.5rem',
+        paddingBottom: '1.5rem',
+        borderBottom: '1px solid var(--border)'
+      }}>
+        <div>
+          <h1 style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '0.75rem', 
+            fontSize: '2.25rem',
+            fontWeight: '800',
+            letterSpacing: '-0.02em',
+            margin: 0
+          }}>
+            <AlertTriangle size={36} color="var(--primary)" />
+            Exception Center
+          </h1>
+          <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem', fontSize: '1rem' }}>
+            {stats.total} loads require manual intervention
+          </p>
+        </div>
+
+        {/* New Compact Insights Bar */}
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <div style={{ 
+            backgroundColor: '#f8fafc', 
+            padding: '0.5rem 1rem', 
+            borderRadius: '0.75rem', 
+            border: '1px solid var(--border)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem'
+          }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--primary)' }} />
+            <span style={{ fontSize: '0.8125rem', fontWeight: '700', color: 'var(--text-main)' }}>{stats.missing_contact} Missing Contact</span>
+          </div>
+          <div style={{ 
+            backgroundColor: '#fff1f2', 
+            padding: '0.5rem 1rem', 
+            borderRadius: '0.75rem', 
+            border: '1px solid #fecdd3',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem'
+          }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#e11d48' }} />
+            <span style={{ fontSize: '0.8125rem', fontWeight: '700', color: '#9f1239' }}>{stats.missing_invoice} Missing Invoices</span>
+          </div>
+          <div style={{ 
+            backgroundColor: '#fffbeb', 
+            padding: '0.5rem 1rem', 
+            borderRadius: '0.75rem', 
+            border: '1px solid #fde68a',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem'
+          }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#d97706' }} />
+            <span style={{ fontSize: '0.8125rem', fontWeight: '700', color: '#92400e' }}>{stats.amount_mismatch} Mismatches</span>
+          </div>
+        </div>
       </div>
 
-      {/* Search and Filters Bar */}
+      {/* Removed large stats cards section */}
+
+      {/* Search and Batch Actions Bar */}
       <div style={{ 
         marginBottom: '2rem', 
         display: 'flex', 
@@ -185,7 +287,7 @@ const ExceptionsPage = () => {
           <Search 
             size={18} 
             color="var(--text-muted)" 
-            style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)' }} 
+            style={{ position: 'absolute', left: '1.25rem', top: '50%', transform: 'translateY(-50%)' }} 
           />
           <input 
             type="text"
@@ -194,91 +296,215 @@ const ExceptionsPage = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
             style={{
               width: '100%',
-              padding: '0.75rem 1rem 0.75rem 3rem',
-              borderRadius: '0.75rem',
-              border: '1px solid var(--border)',
-              fontSize: '0.9375rem',
+              padding: '0.875rem 3.5rem',
+              borderRadius: '1rem',
+              border: 'none',
+              fontSize: '1rem',
               outline: 'none',
               transition: 'all 0.2s',
-              backgroundColor: '#f8fafc'
+              backgroundColor: '#f1f5f9'
             }}
-            onFocus={(e) => e.target.style.borderColor = 'var(--primary)'}
-            onBlur={(e) => e.target.style.borderColor = 'var(--border)'}
           />
         </div>
         
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '0.5rem', 
-          padding: '0.75rem 1rem', 
-          backgroundColor: '#eff6ff', 
-          color: 'var(--primary)', 
-          borderRadius: '0.75rem',
-          fontSize: '0.875rem',
-          fontWeight: '700',
-          cursor: 'pointer'
-        }}>
-          <Filter size={16} />
-          Filters
-        </div>
+        <button 
+          onClick={() => setShowBatchHub(true)}
+          style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '0.75rem', 
+            padding: '0.875rem 1.5rem', 
+            backgroundColor: 'var(--primary)', 
+            color: 'white', 
+            borderRadius: '1rem',
+            fontSize: '0.875rem',
+            fontWeight: '700',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            border: 'none',
+            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.2)'
+          }}
+        >
+          <FileUp size={20} />
+          Batch Resolution Hub
+        </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
-        {(() => {
-          if (exceptions.length > 0) {
-            return exceptions.map(ex => (
-              <div 
-                key={ex.id} 
-                className="card" 
-                onClick={() => setSelectedException(ex)}
-            style={{ 
-              padding: '1.5rem', 
-              cursor: 'pointer', 
-              transition: 'transform 0.2s, box-shadow 0.2s',
-              borderLeft: '4px solid #f59e0b',
-              position: 'relative',
-              display: 'flex',
-              flexDirection: 'column'
+      {/* Batch Resolution Hub Modal */}
+      {showBatchHub && (
+        <>
+          <div 
+            onClick={() => setShowBatchHub(false)}
+            style={{
+              position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(8px)', zIndex: 200
             }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.transform = 'translateY(-4px)';
-              e.currentTarget.style.boxShadow = 'var(--shadow-md)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-              <span style={{ 
-                fontSize: '0.75rem', 
-                fontWeight: '700', 
-                padding: '0.25rem 0.5rem', 
-                backgroundColor: '#fef3c7', 
-                color: '#92400e', 
-                borderRadius: '0.25rem' 
-              }}>
-                {ex.state}
-              </span>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                {ex.updated_at ? new Date(ex.updated_at).toLocaleDateString() : 'Just Now'}
-              </span>
+          />
+          <div style={{
+            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+            width: '800px', maxWidth: '90vw', maxHeight: '90vh',
+            backgroundColor: 'white', zIndex: 201, borderRadius: '1.5rem',
+            display: 'flex', flexDirection: 'column', overflow: 'hidden',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+            animation: 'fadeIn 0.2s ease-out'
+          }}>
+            <div style={{ padding: '2rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <FileUp size={28} color="var(--primary)" />
+                  Batch Resolution Hub
+                </h2>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: '0.25rem' }}>
+                  Resolve multiple exceptions in parallel via CSV automation.
+                </p>
+              </div>
+              <button 
+                onClick={() => setShowBatchHub(false)}
+                style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', padding: '0.5rem', cursor: 'pointer', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <XCircle size={20} color="var(--text-muted)" />
+              </button>
             </div>
 
-            
-            <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem', fontWeight: '600' }}>Load #{ex.reference_number}</h3>
-            <p style={{ fontSize: '0.875rem', color: 'var(--text-main)', lineHeight: '1.5', marginBottom: '1.5rem', flex: 1 }}>
-              {ex.exception_reason || "Load flagged with exception. Manual review required."}
-            </p>
-            
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '1rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', color: 'var(--primary)', fontWeight: '600' }}>
-                Resolve Now <ChevronRight size={16} />
+            <div style={{ padding: '2.5rem', overflowY: 'auto' }}>
+              {/* Flow Guideline */}
+              <div style={{ marginBottom: '3rem' }}>
+                <h4 style={{ fontSize: '0.75rem', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1.5rem' }}>Workflow Guideline</h4>
+                <div style={{ display: 'flex', gap: '1rem', position: 'relative' }}>
+                   {[
+                     { step: 1, title: 'Export Data', desc: 'Get CSV/Excel from your TMS.' },
+                     { step: 2, title: 'Map Columns', desc: 'Ensure headers match requirements.' },
+                     { step: 3, title: 'Automated Fix', desc: 'Upload and let the engine resolve.' }
+                   ].map((item, i) => (
+                     <div key={i} style={{ flex: 1, textAlign: 'center' }}>
+                       <div style={{ 
+                         width: '32px', height: '32px', borderRadius: '50%', 
+                         backgroundColor: 'var(--primary)', color: 'white', 
+                         display: 'flex', alignItems: 'center', justifyContent: 'center',
+                         fontSize: '0.875rem', fontWeight: '800', margin: '0 auto 0.75rem',
+                         boxShadow: '0 0 0 4px var(--primary-light)'
+                       }}>
+                         {item.step}
+                       </div>
+                       <div style={{ fontWeight: '700', fontSize: '0.9375rem', color: 'var(--text-main)', marginBottom: '0.25rem' }}>{item.title}</div>
+                       <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>{item.desc}</p>
+                     </div>
+                   ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                {/* Contact Resolve Section */}
+                <div style={{ padding: '2rem', borderRadius: '1.5rem', border: '1px solid var(--border)', backgroundColor: '#f8fafc', width: '100%', maxWidth: '500px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                    <div style={{ padding: '0.625rem', backgroundColor: 'var(--primary)', borderRadius: '0.75rem', color: 'white' }}>
+                      <User size={24} />
+                    </div>
+                    <h5 style={{ fontSize: '1.125rem', fontWeight: '800', margin: 0 }}>Batch Contact Update</h5>
+                  </div>
+                  <div style={{ backgroundColor: 'white', padding: '1.25rem', borderRadius: '1rem', marginBottom: '2rem', border: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: '0.7rem', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '1rem', letterSpacing: '0.05em', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Affected Loads ({stats.missing_contact})</span>
+                      <span style={{ color: 'var(--primary)' }}>Required Headers</span>
+                    </div>
+                    
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      {['reference_number', 'driver_name', 'driver_phone', 'broker_email'].map(c => (
+                        <code key={c} style={{ fontSize: '0.7rem', color: 'var(--primary)', fontWeight: '600', backgroundColor: 'var(--primary-light)', padding: '0.2rem 0.5rem', borderRadius: '0.4rem' }}>{c}</code>
+                      ))}
+                    </div>
+                  </div>
+
+                  <label style={{ 
+                    display: 'flex', alignItems: 'center', gap: '0.75rem', justifyContent: 'center',
+                    padding: '1rem', backgroundColor: 'var(--primary)', color: 'white', 
+                    borderRadius: '0.75rem', fontWeight: '800', fontSize: '1rem', cursor: 'pointer',
+                    width: '100%', boxShadow: '0 4px 12px rgba(37, 99, 235, 0.2)', transition: 'all 0.2s'
+                  }}>
+                    <Upload size={20} />
+                    Upload Contact CSV
+                    <input type="file" hidden accept=".csv" onChange={handleBatchUpload} />
+                  </label>
+                </div>
               </div>
             </div>
           </div>
-        ));
+        </>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+        {loading ? (
+          <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '4rem' }}>
+             <Clock size={48} className="animate-spin" color="var(--text-muted)" style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
+             <p style={{ color: 'var(--text-muted)' }}>Searching exceptions...</p>
+          </div>
+        ) : (() => {
+          if (exceptions.length > 0) {
+            return exceptions.map(ex => {
+              const type = ex.exception_data?.type;
+              const accentColor = type === 'MISSING_INVOICE_CSV' ? '#e11d48' : 
+                                 type === 'AMOUNT_MISMATCH' ? '#f59e0b' : 
+                                 'var(--primary)';
+              
+              return (
+                <div 
+                  key={ex.id} 
+                  className="card" 
+                  onClick={() => setSelectedException(ex)}
+                  style={{ 
+                    padding: '1.75rem', 
+                    cursor: 'pointer', 
+                    transition: 'all 0.2s ease',
+                    borderLeft: `5px solid ${accentColor}`,
+                    position: 'relative',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    backgroundColor: 'white',
+                    borderRadius: '1rem',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-4px)';
+                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.08)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)';
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.25rem', alignItems: 'flex-start' }}>
+                    <span style={{ 
+                      fontSize: '0.7rem', 
+                      fontWeight: '800', 
+                      padding: '0.35rem 0.65rem', 
+                      backgroundColor: `${accentColor}15`, 
+                      color: accentColor, 
+                      borderRadius: '2rem',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      {type?.replace(/_/g, ' ') || 'ACTION REQUIRED'}
+                    </span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: '500' }}>
+                      {ex.updated_at ? new Date(ex.updated_at).toLocaleDateString() : 'Just Now'}
+                    </span>
+                  </div>
+
+                  <h3 style={{ fontSize: '1.125rem', marginBottom: '0.75rem', fontWeight: '700', color: 'var(--text-main)' }}>
+                    Load #{ex.reference_number}
+                  </h3>
+                  <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', lineHeight: '1.6', marginBottom: '1.5rem', flex: 1 }}>
+                    {ex.exception_reason || "Load flagged with exception. Manual review required."}
+                  </p>
+                  
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #f1f5f9' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: accentColor, fontWeight: '700' }}>
+                      Resolve Now <ChevronRight size={16} />
+                    </div>
+                  </div>
+                </div>
+              );
+            });
           } else if (debouncedSearch) {
             return (
               <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '4rem', backgroundColor: 'white', borderRadius: '1rem', border: '1px dashed var(--border)' }}>
@@ -454,6 +680,13 @@ const ExceptionsPage = () => {
                   </div>
 
                 </div>
+              ) : isInvoiceMissingException ? (
+                <div style={{ marginBottom: '2.5rem' }}>
+                   <h4 style={{ fontSize: '0.8125rem', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '1.25rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>Resolve Documentation</h4>
+                   <p style={{ fontSize: '0.875rem', color: 'var(--text-main)', lineHeight: '1.6' }}>
+                     This load is missing a verified invoice. Please use the <strong>Ingestion</strong> module to upload the corresponding invoice CSV/Excel export from your TMS to resolve this exception.
+                   </p>
+                </div>
               ) : isAmountException ? (
                 <div style={{ marginBottom: '2rem' }}>
                    <h4 style={{ fontSize: '0.8125rem', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '1.25rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.5rem' }}>Financial Correction</h4>
@@ -544,6 +777,10 @@ const ExceptionsPage = () => {
         @keyframes slideIn {
           from { transform: translateX(100%); }
           to { transform: translateX(0); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
     </div>
